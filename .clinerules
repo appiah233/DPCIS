@@ -1,0 +1,10 @@
+# Shared Workspace Governance & Cline Coordination (`Examination Hub`)
+
+All workspace rules live canonically in `AGENTS.md` (workspace root). Do not duplicate or contradict `AGENTS.md` or user-global rules.
+
+Shared quick-reference invariants for peer engineering in `C:\Users\EricAppiahOwusu\Music\DPCIS`:
+1. **Coordination Ledger:** Read and respect `docs/agent-coordination.md` before claiming or modifying shared files. List active workstreams (`WORKSTREAM`, `OWNER`, `STATUS`, `FILES/DIRECTORIES`, `HANDOFF NOTES`) cleanly without overwriting active peer edits.
+2. **Auth & Stack:** Neon Managed Better Auth + PostgreSQL + FastAPI + React/Vite/Tailwind (`frontend/`). Clerk is permanently removed — never reintroduce Clerk. One responsive web app only (desktop, tablet, mobile browser 320px–1440px+); no native mobile app.
+3. **Neon & Production Safety:** Correct Neon org is **Dexta Global** (`org-weathered-mud-72902193`, project `noisy-boat-95673317`), never **Eric** (`org-raspy-sunset-55790868`). Never create new Neon orgs/projects, never modify `neon_auth.*`, never run automated tests or unapproved migrations against production, never commit/push/deploy production autonomously, and never leave real credentials in `.env.example` or tracked files.
+4. **Server Authority:** FastAPI owns `application_users` roles (`ADMIN`/`STUDENT`), `started_at`/`expires_at` timer, answer validation, deterministic `Decimal` grading, and answer-key (`is_correct`) isolation from active student DTOs.
+5. **Additive Migrations:** Keep a single linear Alembic head (`0001_application_users` -> `0002_examination_schema` -> `0003_attempt_option_order` -> additive migrations only).

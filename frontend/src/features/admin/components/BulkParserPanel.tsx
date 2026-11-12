@@ -1,0 +1,500 @@
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ClipboardPaste,
+  FilePlus2,
+  ListChecks,
+  Replace,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
+import { useId, useMemo, useState } from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { parseQuestions } from "@/features/admin/adminApi";
+import {
+  extractAdminApiError,
+  fromParsedQuestion,
+  type EditableQuestion,
+} from "@/features/admin/adminUtils";
+import { cn } from "@/lib/utils";
+import type { ParsedQuestion, ParseQuestionsResponse } from "@/types/adminExam";
+
+const SAMPLE_FORMAT_TEXT = `1. Which protocol secures HTTP traffic using TLS?
+A. FTP
+B. HTTPS
+C. Telnet
+D. SMTP
+ANSWER: B
+
+2. Which status code indicates a newly created resource?
+A. 200 OK
+B. 201 Created
+C. 404 Not Found
+D. 409 Conflict
+ANSWER: B`;
+
+export interface BulkParserPanelProps {
+  disabled?: boolean;
+  existingQuestionCount: number;
+  onApplyQuestions: (questions: EditableQuestion[], mode: "append" | "replace") => void;
+}
+
+export function BulkParserPanel({
+  disabled = false,
+  existingQuestionCount,
+  onApplyQuestions,
+}: BulkParserPanelProps) {
+  const baseId = useId();
+  const textareaId = `${baseId}-raw-text`;
+  const helpId = `${baseId}-format-help`;
+
+  const [rawText, setRawText] = useState("");
+  const [isParsing, setIsParsing] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [parseResult, setParseResult] = useState<ParseQuestionsResponse | null>(null);
+  const [appliedBanner, setAppliedBanner] = useState<string | null>(null);
+  const [confirmReplaceMode, setConfirmReplaceMode] = useState<"valid" | "all" | null>(null);
+
+  const orderedBlocks = useMemo<ParsedQuestion[]>(() => {
+    if (!parseResult) {
+      return [];
+    }
+    return [...parseResult.valid_questions, ...parseResult.invalid_questions].sort(
+      (a, b) => a.position - b.position,
+    );
+  }, [parseResult]);
+
+  const handleParse = async () => {
+    if (disabled || isParsing) {
+      return;
+    }
+
+    setIsParsing(true);
+    setRequestError(null);
+    setAppliedBanner(null);
+
+    try {
+      const response = await parseQuestions(rawText);
+      setParseResult(response);
+    } catch (error) {
+      setRequestError(
+        extractAdminApiError(error, "Unable to parse question text.").message,
+      );
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const applyParsedBlocks = (
+    items: ParsedQuestion[],
+    mode: "append" | "replace",
+    includeInvalidNote: boolean,
+  ) => {
+    const editable = items.map(fromParsedQuestion);
+    onApplyQuestions(editable, mode);
+    setAppliedBanner(
+      `${mode === "replace" ? "Replaced draft list with" : "Added"} ${editable.length} question${editable.length === 1 ? "" : "s"} in the editor below.${includeInvalidNote ? " Fix any highlighted blocks lacking a valid answer before saving." : " Review and click Save Questions to persist."}`,
+    );
+  };
+
+  const handleReplaceValidClick = () => {
+    if (!parseResult || parseResult.valid_questions.length === 0) {
+      return;
+    }
+    if (existingQuestionCount > 0) {
+      setConfirmReplaceMode("valid");
+      return;
+    }
+    applyParsedBlocks(parseResult.valid_questions, "replace", false);
+  };
+
+  const handleImportAllWithFixes = () => {
+    if (!parseResult || orderedBlocks.length === 0) {
+      return;
+    }
+    if (existingQuestionCount > 0) {
+      setConfirmReplaceMode("all");
+      return;
+    }
+    applyParsedBlocks(
+      orderedBlocks,
+      "replace",
+      parseResult.invalid_questions.length > 0,
+    );
+  };
+
+  const handleConfirmReplace = () => {
+    if (!parseResult || !confirmReplaceMode) {
+      return;
+    }
+    if (confirmReplaceMode === "valid") {
+      applyParsedBlocks(parseResult.valid_questions, "replace", false);
+    } else {
+      applyParsedBlocks(
+        orderedBlocks,
+        "replace",
+        parseResult.invalid_questions.length > 0,
+      );
+    }
+    setConfirmReplaceMode(null);
+  };
+
+  return (
+    <Card as="section" aria-labelledby={`${baseId}-heading`}>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle as="h2" id={`${baseId}-heading`}>
+              Bulk Question Text Import &amp; Parser Preview
+            </CardTitle>
+            <CardDescription>
+              Paste multiple-choice questions for deterministic server parsing and block-level
+              validation before saving to the draft. No answers are guessed automatically.
+            </CardDescription>
+          </div>
+          <Badge variant="outline">
+            <ClipboardPaste className="size-3.5" aria-hidden="true" />
+            <span>Stateless Preview</span>
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        <div className="rounded-lg border border-border bg-muted/40 p-3.5 text-xs leading-relaxed text-muted-foreground">
+          <p className="font-semibold text-foreground">Expected MCQ block format</p>
+          <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-foreground">
+            {`1. Question stem...\nA. Option A\nB. Option B\nC. Option C (optional)\nD. Option D (optional)\nANSWER: B`}
+          </pre>
+          <p id={helpId} className="mt-2">
+            Also supports <code>1)</code>, <code>Q1:</code>, lowercase <code>a.</code>/<code>a)</code>,
+            and <code>Ans: X</code> / <code>Correct Answer: X</code>. Every block must have 2–4
+            sequential options starting at <code>A</code> and an explicit answer key.
+          </p>
+        </div>
+
+        <div className="field-group space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label htmlFor={textareaId}>Raw MCQ text</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={disabled || isParsing}
+                onClick={() => {
+                  setRawText(SAMPLE_FORMAT_TEXT);
+                  setRequestError(null);
+                  setAppliedBanner(null);
+                }}
+              >
+                <Sparkles className="size-4" aria-hidden="true" />
+                <span>Load example</span>
+              </Button>
+              {rawText ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled || isParsing}
+                  onClick={() => {
+                    setRawText("");
+                    setParseResult(null);
+                    setRequestError(null);
+                    setAppliedBanner(null);
+                  }}
+                >
+                  Clear text
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <Textarea
+            id={textareaId}
+            value={rawText}
+            disabled={disabled || isParsing}
+            aria-describedby={helpId}
+            rows={10}
+            className="min-h-56 font-mono text-sm"
+            placeholder={SAMPLE_FORMAT_TEXT}
+            onChange={(event) => {
+              setRawText(event.target.value);
+              setRequestError(null);
+              setAppliedBanner(null);
+            }}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            disabled={disabled || isParsing}
+            onClick={() => void handleParse()}
+          >
+            <ListChecks className="size-4" aria-hidden="true" />
+            <span>{isParsing ? "Parsing..." : "Parse Questions"}</span>
+          </Button>
+          {disabled ? (
+            <span className="text-xs text-muted-foreground">
+              Bulk import is only available while the examination is in Draft status.
+            </span>
+          ) : null}
+        </div>
+
+        {requestError ? (
+          <Alert variant="destructive" role="alert">
+            <AlertTitle>Parser request failed</AlertTitle>
+            <AlertDescription>{requestError}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {appliedBanner ? (
+          <Alert variant="success" role="status">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <div>
+                <AlertTitle>Loaded into Question Editor</AlertTitle>
+                <AlertDescription>{appliedBanner}</AlertDescription>
+              </div>
+            </div>
+          </Alert>
+        ) : null}
+
+        {parseResult ? (
+          <div className="space-y-4 border-t border-border pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-foreground">Parse Preview</h3>
+              <div className="flex flex-wrap gap-2" role="status">
+                <Badge variant="secondary">Total blocks: {parseResult.total_blocks}</Badge>
+                <Badge variant={parseResult.valid_count > 0 ? "success" : "secondary"}>
+                  Valid: {parseResult.valid_count}
+                </Badge>
+                <Badge variant={parseResult.error_count > 0 ? "destructive" : "secondary"}>
+                  Errors: {parseResult.error_count}
+                </Badge>
+              </div>
+            </div>
+
+            {parseResult.errors.length > 0 ? (
+              <Alert variant="destructive" role="alert">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+                  <div className="min-w-0 space-y-2">
+                    <AlertTitle>
+                      Parser found {parseResult.error_count} validation issue
+                      {parseResult.error_count === 1 ? "" : "s"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      <p className="mb-2">
+                        Correct the text above and re-parse, or load blocks into the inline editor to
+                        assign missing answers manually.
+                      </p>
+                      <ul className="list-disc space-y-1 pl-5 break-words">
+                        {parseResult.errors.map((err, index) => (
+                          <li key={`${err.block_index}-${index}`}>
+                            <strong>
+                              {err.block_index === 0
+                                ? "Input"
+                                : `Question block #${err.block_index}`}
+                              :
+                            </strong>{" "}
+                            {err.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </div>
+                </div>
+              </Alert>
+            ) : (
+              <Alert variant="success" role="status">
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <div>
+                    <AlertTitle>All {parseResult.valid_count} blocks parsed cleanly</AlertTitle>
+                    <AlertDescription>
+                      Review the preview cards below, then append or replace them in your draft
+                      question list.
+                    </AlertDescription>
+                  </div>
+                </div>
+              </Alert>
+            )}
+
+            {orderedBlocks.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2.5">
+                  {parseResult.valid_questions.length > 0 ? (
+                    <>
+                      <Button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() =>
+                          applyParsedBlocks(parseResult.valid_questions, "append", false)
+                        }
+                      >
+                        <FilePlus2 className="size-4" aria-hidden="true" />
+                        <span>Append valid ({parseResult.valid_questions.length})</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={disabled}
+                        onClick={handleReplaceValidClick}
+                      >
+                        <Replace className="size-4" aria-hidden="true" />
+                        <span>Replace list with valid ({parseResult.valid_questions.length})</span>
+                      </Button>
+                    </>
+                  ) : null}
+
+                  {parseResult.invalid_questions.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={disabled}
+                      onClick={() =>
+                        applyParsedBlocks(
+                          parseResult.invalid_questions,
+                          "append",
+                          true,
+                        )
+                      }
+                    >
+                      <Wrench className="size-4" aria-hidden="true" />
+                      <span>
+                        Append invalid ({parseResult.invalid_questions.length}) to fix inline
+                      </span>
+                    </Button>
+                  ) : null}
+
+                  {parseResult.invalid_questions.length > 0 &&
+                  parseResult.valid_questions.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={disabled}
+                      onClick={handleImportAllWithFixes}
+                    >
+                      <span>Replace list with all ({orderedBlocks.length}) &amp; fix inline</span>
+                    </Button>
+                  ) : null}
+                </div>
+
+                <ol className="grid gap-3">
+                  {orderedBlocks.map((block) => {
+                    const missingAnswer = block.answer_label === null;
+                    return (
+                      <li
+                        key={`preview-block-${block.position}`}
+                        className={cn(
+                          "rounded-lg border p-4",
+                          block.valid
+                            ? "border-border bg-card"
+                            : "border-destructive-border bg-destructive-subtle/40",
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Parsed Block #{block.position}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {block.valid ? (
+                              <Badge variant="success">
+                                <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                                <span>Valid · Answer {block.answer_label}</span>
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive">
+                                <AlertTriangle className="size-3.5" aria-hidden="true" />
+                                <span>
+                                  {missingAnswer
+                                    ? "Invalid · No answer key"
+                                    : `Invalid (${block.errors.length})`}
+                                </span>
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="mt-2 break-words text-sm font-medium text-foreground">
+                          {block.question_text || (
+                            <em className="text-destructive">(Empty question stem)</em>
+                          )}
+                        </p>
+
+                        {block.options.length > 0 ? (
+                          <ul className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
+                            {block.options.map((opt) => {
+                              const isAnswer = block.answer_label === opt.label;
+                              return (
+                                <li
+                                  key={`${block.position}-${opt.label}`}
+                                  className={cn(
+                                    "min-w-0 break-words rounded-md border px-2.5 py-1.5 text-xs",
+                                    isAnswer
+                                      ? "border-success-border bg-success-subtle font-medium text-success"
+                                      : "border-border bg-background text-foreground",
+                                  )}
+                                >
+                                  <strong className="mr-1.5">{opt.label}.</strong>
+                                  <span>{opt.option_text}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+
+                        {block.errors.length > 0 ? (
+                          <ul className="mt-3 list-disc space-y-0.5 pl-5 break-words text-xs font-medium text-destructive">
+                            {block.errors.map((msg, errIdx) => (
+                              <li key={errIdx}>{msg}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </CardContent>
+
+      <CardFooter className="text-xs text-muted-foreground">
+        Parsing previews questions only — nothing is saved until you click Save Questions in the
+        editor below.
+      </CardFooter>
+
+      <ConfirmDialog
+        open={confirmReplaceMode !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmReplaceMode(null);
+          }
+        }}
+        title="Replace current draft questions?"
+        description={`This will replace the ${existingQuestionCount} question${existingQuestionCount === 1 ? "" : "s"} currently loaded in the editor. Changes are still unsaved until you click Save Questions.`}
+        confirmLabel="Replace questions"
+        confirmVariant="destructive"
+        onConfirm={handleConfirmReplace}
+      />
+    </Card>
+  );
+}
