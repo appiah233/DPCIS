@@ -14,14 +14,14 @@ interface RouteMetadata {
 function resolveRouteMetadata(pathname: string): RouteMetadata {
   if (pathname === "/") {
     return {
-      title: "Overview | Examination Hub",
-      announcement: "Overview page",
+      title: "Sign In | Examination Hub",
+      announcement: "Sign in page",
     };
   }
   if (pathname === "/student") {
     return {
-      title: "Student Dashboard | Examination Hub",
-      announcement: "Student dashboard page",
+      title: "Examinations | Examination Hub",
+      announcement: "Examinations page",
     };
   }
   if (pathname.startsWith("/student/attempts/")) {
@@ -45,8 +45,8 @@ function resolveRouteMetadata(pathname: string): RouteMetadata {
   }
   if (pathname === "/admin") {
     return {
-      title: "Admin Dashboard | Examination Hub",
-      announcement: "Admin dashboard page",
+      title: "Examinations | Examination Hub",
+      announcement: "Examinations management page",
     };
   }
   if (pathname === "/admin/exams/new") {
@@ -58,7 +58,7 @@ function resolveRouteMetadata(pathname: string): RouteMetadata {
   if (/^\/admin\/exams\/[^/]+\/results\/?$/.test(pathname)) {
     return {
       title: "Examination Results | Examination Hub",
-      announcement: "Examination results oversight page",
+      announcement: "Examination results page",
     };
   }
   if (pathname.startsWith("/admin/exams/")) {
@@ -165,7 +165,7 @@ export function AppShell({
         <footer className="border-t border-border bg-card">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p>Examination Hub — Digital Assessment Platform</p>
-            <p>Authoritative Server Timing · Role-Based Access Control</p>
+            <p>Calm &amp; Focused Online Assessment</p>
           </div>
         </footer>
       ) : null}

@@ -231,16 +231,17 @@ export function ExamSettingsForm({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle as="h2" id={`${baseId}-heading`}>
-              {mode === "create" ? "Examination Configuration" : "Settings & Delivery Rules"}
+              {mode === "create" ? "Examination Details & Settings" : "Exam Settings"}
             </CardTitle>
             <CardDescription>
-              Configure timing, pass mark, randomization, attempt limits, and student result disclosure.
+              Set the timing, pass mark, question order, attempt limit, and what students see
+              after finishing.
             </CardDescription>
           </div>
           {readOnly ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
               <Lock className="size-3.5" aria-hidden="true" />
-              <span>Locked ({exam?.status})</span>
+              <span>Locked ({exam?.status === "PUBLISHED" ? "Published" : "Closed"})</span>
             </span>
           ) : null}
         </div>
@@ -476,7 +477,7 @@ export function ExamSettingsForm({
 
           <fieldset className="space-y-3 border-0 p-0">
             <legend className="text-sm font-semibold text-foreground">
-              Delivery &amp; Result Visibility Options
+              Question Order &amp; Student Results
             </legend>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -498,7 +499,7 @@ export function ExamSettingsForm({
                     Randomize question order
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    Shuffles question sequence per student attempt snapshot.
+                    Gives each student a shuffled question order.
                   </span>
                 </span>
               </label>
@@ -521,7 +522,7 @@ export function ExamSettingsForm({
                     Randomize option order
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    Shuffles options A–D independently per attempt while preserving labels.
+                    Shuffles choices A–D for each student.
                   </span>
                 </span>
               </label>
@@ -547,7 +548,7 @@ export function ExamSettingsForm({
                     Show score &amp; outcome to students
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    Students see their graded percentage and pass/fail status after submitting.
+                    Students see their percentage score and pass/fail result after submitting.
                   </span>
                 </span>
               </label>
@@ -577,7 +578,7 @@ export function ExamSettingsForm({
                   </span>
                   <span className="block text-xs text-muted-foreground">
                     {values.showResult
-                      ? "Reveals answer keys only after the attempt is finalized."
+                      ? "Shows the correct answers after a student submits."
                       : "Enable 'Show score & outcome to students' first."}
                   </span>
                 </span>

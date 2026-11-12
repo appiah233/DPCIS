@@ -32,14 +32,14 @@ export function AdminExamNewPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administrator Workspace"
-        title="Create New Examination"
-        description="Step 1: Define examination timing, pass mark, randomization, and feedback policies. You can bulk-paste MCQ questions immediately on the next screen."
+        eyebrow="Admin Dashboard"
+        title="Create Examination"
+        description="Set the title, timing, pass mark, and student result settings. You can add or paste questions on the next screen."
         action={
           <Button asChild variant="outline">
             <Link to="/admin">
               <ArrowLeft className="size-4" aria-hidden="true" />
-              <span>Back to Dashboard</span>
+              <span>Back to Examinations</span>
             </Link>
           </Button>
         }

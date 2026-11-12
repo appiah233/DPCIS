@@ -12,27 +12,42 @@ export interface AuthUser {
   email?: string | null;
 }
 
+const AUTH_UNAVAILABLE_MESSAGE = "Authentication is currently unavailable.";
+
+function resolveSafeCallbackUrl(callbackURL?: string): string {
+  const fallbackUrl = `${window.location.origin}/`;
+  if (!callbackURL) {
+    return fallbackUrl;
+  }
+  try {
+    const parsed = new URL(callbackURL, window.location.origin);
+    return parsed.origin === window.location.origin ? parsed.toString() : fallbackUrl;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
 export async function signUpWithEmail(email: string, password: string, name: string) {
   if (!neonAuthClient) {
-    throw new Error("Neon Managed Auth is not configured.");
+    throw new Error(AUTH_UNAVAILABLE_MESSAGE);
   }
   return neonAuthClient.signUp.email({ email, password, name });
 }
 
 export async function signInWithEmail(email: string, password: string) {
   if (!neonAuthClient) {
-    throw new Error("Neon Managed Auth is not configured.");
+    throw new Error(AUTH_UNAVAILABLE_MESSAGE);
   }
   return neonAuthClient.signIn.email({ email, password });
 }
 
 export async function signInWithGoogle(callbackURL?: string) {
   if (!neonAuthClient) {
-    throw new Error("Neon Managed Auth is not configured.");
+    throw new Error(AUTH_UNAVAILABLE_MESSAGE);
   }
   return neonAuthClient.signIn.social({
     provider: "google",
-    callbackURL: callbackURL ?? window.location.href,
+    callbackURL: resolveSafeCallbackUrl(callbackURL),
   });
 }
 

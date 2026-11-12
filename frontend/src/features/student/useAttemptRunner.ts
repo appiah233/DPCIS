@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { AnswerSaveStatus } from "@/components/exam/ExamProgressHeader";
+import { formatStudentErrorMessage } from "@/features/student/formatters";
 import {
   fetchAttemptDelivery,
   saveAttemptAnswer,
@@ -109,19 +110,11 @@ function isAttemptFinalizedConflict(error: unknown): error is ApiClientError {
 }
 
 function getAttemptConflictNotice(error: ApiClientError): string {
-  const trimmed = error.message.trim();
-  const hasSpecificMessage =
-    trimmed.length > 0 && !trimmed.startsWith("Backend responded with HTTP ");
-
-  if (error.code === "ATTEMPT_EXPIRED") {
-    return hasSpecificMessage
-      ? trimmed
-      : "Examination time has expired. Your attempt has been finalized.";
-  }
-
-  return hasSpecificMessage
-    ? trimmed
-    : "This examination attempt has already been finalized.";
+  const fallback =
+    error.code === "ATTEMPT_EXPIRED"
+      ? "Examination time has expired. Your attempt has been finalized."
+      : "This examination attempt has already been finalized.";
+  return formatStudentErrorMessage(error, fallback);
 }
 
 export function useAttemptRunner(attemptId: string | undefined): AttemptRunnerState {
@@ -229,9 +222,10 @@ export function useAttemptRunner(attemptId: string | undefined): AttemptRunnerSt
           return;
         }
         setSubmitError(
-          error instanceof Error
-            ? error.message
-            : "Unable to submit your examination right now. Please try again.",
+          formatStudentErrorMessage(
+            error,
+            "Unable to submit your examination right now. Please try again.",
+          ),
         );
         submitInFlightRef.current = false;
         setIsSubmitting(false);
@@ -299,9 +293,10 @@ export function useAttemptRunner(attemptId: string | undefined): AttemptRunnerSt
         }
         setStatus("error");
         setLoadError(
-          error instanceof Error
-            ? error.message
-            : "Unable to load your examination session.",
+          formatStudentErrorMessage(
+            error,
+            "Unable to load your examination session.",
+          ),
         );
       });
 
@@ -374,10 +369,10 @@ export function useAttemptRunner(attemptId: string | undefined): AttemptRunnerSt
           questionId,
           failedTarget,
         );
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Could not save your answer selection.";
+        const message = formatStudentErrorMessage(
+          error,
+          "Could not save your answer selection.",
+        );
 
         const nextFailedSave: FailedSaveNotice = {
           questionId,

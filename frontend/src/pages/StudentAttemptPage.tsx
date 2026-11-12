@@ -81,7 +81,7 @@ export function StudentAttemptPage() {
         </h1>
         <ErrorStatePanel
           title="Could not load this examination attempt"
-          message={loadError ?? "Unable to retrieve the active attempt from the server."}
+          message={loadError ?? "We could not open this examination sitting right now."}
           onRetry={reload}
           action={
             <Button asChild variant="outline">
@@ -135,7 +135,6 @@ export function StudentAttemptPage() {
         answeredCount={answeredCount}
         saveStatus={saveStatus}
         saveMessage={saveMessage}
-        onOpenQuestionMap={() => setIsNavigatorOpen(true)}
       />
 
       {isExpired ? (
@@ -147,8 +146,8 @@ export function StudentAttemptPage() {
                 <AlertTitle>Examination time has expired</AlertTitle>
                 <AlertDescription>
                   {isSubmitting
-                    ? "Submitting your recorded answers to the server..."
-                    : "Answer changes are locked. Finalize your sitting to view your submission status."}
+                    ? "Submitting your recorded answers..."
+                    : "Answer changes are locked. Select Finalize & Continue to complete your sitting."}
                 </AlertDescription>
               </div>
             </div>
@@ -254,7 +253,7 @@ export function StudentAttemptPage() {
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              aria-label={`Open question navigator (${answeredCount} of ${totalQuestions} answered)`}
               onClick={() => setIsNavigatorOpen(true)}
             >
               <LayoutGrid className="size-4" aria-hidden="true" />
@@ -289,7 +288,7 @@ export function StudentAttemptPage() {
         open={isSubmitDialogOpen}
         onOpenChange={setIsSubmitDialogOpen}
         title="Review & Submit Examination?"
-        description="Once submitted, your responses are locked and sent for immediate server grading."
+        description="Once submitted, your answers are locked and cannot be changed."
         confirmLabel="Submit Examination"
         cancelLabel="Return to Exam"
         isPending={isSubmitting}

@@ -1,131 +1,150 @@
-import { ArrowRight, CheckCircle2, Database, Lock, ShieldCheck } from "lucide-react";
-import { Link } from "react-router-dom";
+import { CheckCircle2 } from "lucide-react";
+import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
 
-import { HealthStatusCard } from "@/components/HealthStatusCard";
-import { PageHeader } from "@/components/PageHeader";
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ErrorStatePanel, LoadingStatePanel } from "@/components/ui/state-panel";
 import { AuthBoundary } from "@/features/auth/AuthBoundary";
 import { useAuth } from "@/features/auth/useAuth";
+import { useHealthCheck } from "@/hooks/useHealthCheck";
+
+const REASSURANCE_ITEMS = [
+  "Calm, focused single-question experience",
+  "Answers saved automatically as you work",
+  "Clear countdown timer throughout your sitting",
+  "Results shown when permitted by your administrator",
+] as const;
 
 export function OverviewPage() {
-  const { identity } = useAuth();
+  const {
+    isConfigured,
+    isLoading,
+    sessionUser,
+    identity,
+    errorMessage,
+    refreshAuth,
+    signOut,
+  } = useAuth();
+  const { state: healthState, refresh: refreshHealth } = useHealthCheck();
+
+  useEffect(() => {
+    if (import.meta.env.DEV && healthState.kind === "unreachable") {
+      console.warn(
+        "[Examination Hub] Background connectivity check unavailable:",
+        healthState.errorMessage,
+      );
+    }
+  }, [healthState]);
+
+  if (isConfigured && isLoading) {
+    return (
+      <div className="mx-auto max-w-md space-y-6 py-4 sm:py-8">
+        <header className="space-y-2 text-center">
+          <h1
+            tabIndex={-1}
+            className="text-2xl font-semibold tracking-tight text-foreground outline-none sm:text-3xl"
+          >
+            Examination Hub
+          </h1>
+          <p className="text-sm text-muted-foreground sm:text-base">
+            Checking your session...
+          </p>
+        </header>
+        <LoadingStatePanel label="Checking your session..." cards={1} />
+      </div>
+    );
+  }
+
+  if (isConfigured && sessionUser && identity) {
+    return <Navigate to={identity.role === "ADMIN" ? "/admin" : "/student"} replace />;
+  }
+
+  if (isConfigured && sessionUser && !identity) {
+    return (
+      <div className="mx-auto max-w-xl space-y-6 py-4 sm:py-8">
+        <header className="space-y-2 text-center">
+          <h1
+            tabIndex={-1}
+            className="text-2xl font-semibold tracking-tight text-foreground outline-none sm:text-3xl"
+          >
+            Examination Hub
+          </h1>
+          <p className="text-sm text-muted-foreground sm:text-base">
+            A focused and secure place to take your examinations.
+          </p>
+        </header>
+
+        <ErrorStatePanel
+          title="We could not open your workspace right now."
+          message={errorMessage ?? "Please check your connection and try again."}
+          retryLabel="Try Again"
+          onRetry={() => void refreshAuth()}
+          action={
+            <Button type="button" variant="outline" onClick={() => void signOut()}>
+              Sign out
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Assessment Portal"
-        title="Examination Hub"
-        description="Server-authoritative timed multiple-choice examinations with Neon Managed Auth, instant backend grading, and permanent attempt records."
-      />
-
-      <section aria-labelledby="runtime-readiness-heading" className="space-y-4">
-        <h2
-          id="runtime-readiness-heading"
-          className="text-lg font-semibold tracking-tight text-foreground"
+    <div className="mx-auto max-w-md space-y-6 py-2 sm:py-6">
+      <header className="space-y-2 text-center">
+        <h1
+          tabIndex={-1}
+          className="text-2xl font-semibold tracking-tight text-foreground outline-none sm:text-3xl"
         >
-          Account &amp; Service Status
-        </h2>
-        <div className="card-grid">
-          <HealthStatusCard />
-          <AuthBoundary />
-        </div>
-      </section>
+          Examination Hub
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+          A focused and secure place to take your examinations.
+        </p>
+      </header>
 
-      <section aria-labelledby="workspace-routes-heading" className="space-y-4">
-        <h2
-          id="workspace-routes-heading"
-          className="text-lg font-semibold tracking-tight text-foreground"
+      {healthState.kind === "unreachable" ? (
+        <Alert variant="warning" role="status">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 space-y-1">
+              <AlertTitle>
+                We&apos;re having trouble connecting to Examination Hub.
+              </AlertTitle>
+              <AlertDescription>
+                Please check your connection and try again.
+              </AlertDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[44px] shrink-0"
+              onClick={() => void refreshHealth()}
+            >
+              Try Again
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
+
+      <AuthBoundary onAuthSuccess={refreshAuth} />
+
+      {isConfigured ? (
+        <ul
+          aria-label="Examination experience highlights"
+          className="grid gap-2.5 px-1 text-sm text-muted-foreground"
         >
-          Examination Workspaces
-        </h2>
-        <div className="card-grid">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle as="h3">Student Examination Portal</CardTitle>
-                <Badge variant={identity?.role === "STUDENT" ? "accent" : "secondary"}>
-                  {identity?.role === "STUDENT" ? "Your Portal" : "Student Role"}
-                </Badge>
-              </div>
-              <CardDescription>
-                View published examinations, take timed assessments with live autosave, recover
-                seamlessly across refreshes, and review permitted scores.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter>
-              <Button asChild variant="outline">
-                <Link to="/student">
-                  <span>Open Student Portal</span>
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle as="h3">Administrator Console</CardTitle>
-                <Badge variant={identity?.role === "ADMIN" ? "accent" : "secondary"}>
-                  {identity?.role === "ADMIN" ? "Your Console" : "Admin Role"}
-                </Badge>
-              </div>
-              <CardDescription>
-                Create examinations, parse and edit bulk MCQ items, configure pass marks and timers,
-                publish exams, and audit student outcomes.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter>
-              <Button asChild variant="outline">
-                <Link to="/admin">
-                  <span>Open Admin Console</span>
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle as="h3">Integrity &amp; Timer Guarantees</CardTitle>
-                <Badge variant="outline">Server-Enforced</Badge>
-              </div>
-              <CardDescription>
-                Core examination rules verified strictly on FastAPI and PostgreSQL, independent of
-                browser state.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Lock className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span>Answer keys stay server-side throughout active attempts</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span>Countdown and expiry deadlines derive from server UTC timestamps</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span>Role access enforced against application_users in PostgreSQL</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Database className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span>Finalized attempt scores and question snapshots are immutable</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+          {REASSURANCE_ITEMS.map((item) => (
+            <li key={item} className="flex items-start gap-2.5">
+              <CheckCircle2
+                className="mt-0.5 size-4 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

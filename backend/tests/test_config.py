@@ -1,16 +1,21 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from app.config import ConfigurationError, Settings
 
 
-def test_development_defaults_load_predictably_without_external_secrets() -> None:
+def test_development_defaults_load_predictably_without_external_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
     settings = Settings(_env_file=None)
 
     assert settings.APP_NAME == "Examination Hub API"
     assert settings.APP_VERSION == "0.1.0"
     assert settings.APP_ENV == "development"
-    assert settings.CORS_ORIGINS == ["http://localhost:5173"]
+    assert settings.CORS_ORIGINS == ["http://localhost:5173", "http://127.0.0.1:5173"]
     assert settings.DATABASE_URL is None
     assert settings.NEON_AUTH_BASE_URL is None
 
@@ -25,6 +30,55 @@ def test_cors_origins_parses_comma_separated_and_strips_trailing_slashes() -> No
         "https://app.example.com",
         "https://admin.example.com",
     ]
+
+
+@pytest.mark.parametrize(
+    ("raw_cors", "expected"),
+    [
+        (
+            "http://localhost:5173,http://127.0.0.1:5173",
+            ["http://localhost:5173", "http://127.0.0.1:5173"],
+        ),
+        (
+            "https://app.example.com/",
+            ["https://app.example.com"],
+        ),
+        (
+            '["https://app.example.com","https://admin.example.com"]',
+            ["https://app.example.com", "https://admin.example.com"],
+        ),
+    ],
+)
+def test_cors_origins_loads_comma_separated_and_json_from_env_and_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    raw_cors: str,
+    expected: list[str],
+) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", raw_cors)
+    env_settings = Settings(_env_file=None)
+    assert env_settings.CORS_ORIGINS == expected
+
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    dotenv_file = tmp_path / ".env"
+    dotenv_file.write_text(f"CORS_ORIGINS={raw_cors}\n", encoding="utf-8")
+    dotenv_settings = Settings(_env_file=dotenv_file)
+    assert dotenv_settings.CORS_ORIGINS == expected
+
+
+def test_invalid_cors_origin_wildcard_from_env_and_dotenv_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", "*")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    dotenv_file = tmp_path / ".env"
+    dotenv_file.write_text("CORS_ORIGINS=*\n", encoding="utf-8")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=dotenv_file)
 
 
 @pytest.mark.parametrize(
@@ -61,12 +115,45 @@ def test_deployed_environments_require_database_and_neon_auth_config(env_name: s
     assert "NEON_AUTH_JWKS_URL" in message
 
 
-def test_production_rejects_wildcard_or_localhost_cors_origins() -> None:
+@pytest.mark.parametrize("env_name", ["staging", "production"])
+def test_deployed_environments_reject_default_cors_origins(
+    monkeypatch: pytest.MonkeyPatch,
+    env_name: str,
+) -> None:
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
     with pytest.raises(ValidationError):
         Settings(
             _env_file=None,
-            APP_ENV="production",
-            CORS_ORIGINS=["http://localhost:5173"],
+            APP_ENV=env_name,
+            DATABASE_URL="postgresql://user:pass@ep-demo.neon.tech/db?sslmode=require",
+            NEON_AUTH_JWKS_URL="https://auth.example.com/.well-known/jwks.json",
+            NEON_AUTH_BASE_URL="https://auth.example.com",
+        )
+
+
+@pytest.mark.parametrize("env_name", ["staging", "production"])
+@pytest.mark.parametrize(
+    "unsafe_origins",
+    [
+        ["http://localhost:5173"],
+        ["http://127.0.0.1:5173"],
+        ["https://localhost:5173"],
+        ["https://127.0.0.1:5173"],
+        ["https://[::1]:5173"],
+        ["https://0.0.0.0:5173"],
+        ["http://app.example.com"],
+        ["*"],
+    ],
+)
+def test_deployed_environments_reject_default_and_loopback_cors_origins(
+    env_name: str,
+    unsafe_origins: list[str],
+) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            APP_ENV=env_name,
+            CORS_ORIGINS=unsafe_origins,
             DATABASE_URL="postgresql://user:pass@ep-demo.neon.tech/db?sslmode=require",
             NEON_AUTH_JWKS_URL="https://auth.example.com/.well-known/jwks.json",
             NEON_AUTH_BASE_URL="https://auth.example.com",

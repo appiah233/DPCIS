@@ -1,15 +1,23 @@
-import { Menu, ShieldCheck } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { LogOut, Menu, ShieldCheck } from "lucide-react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
+import { useOptionalAuth } from "@/features/auth/useAuth";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Overview", end: true },
-  { to: "/student", label: "Student", end: false },
-  { to: "/admin", label: "Admin", end: false },
-] as const;
+interface HeaderNavItem {
+  to: string;
+  label: string;
+  end: boolean;
+}
 
 export interface AppHeaderProps {
   examFocusMode?: boolean;
@@ -22,6 +30,7 @@ export function AppHeader({
   examTitle,
   examHeaderSlot,
 }: AppHeaderProps) {
+  const auth = useOptionalAuth();
   const menuId = useId();
   const { pathname } = useLocation();
   const headerRef = useRef<HTMLElement>(null);
@@ -31,11 +40,36 @@ export function AppHeader({
 
   const [isWide, setIsWide] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const isAuthenticated = Boolean(auth?.sessionUser && auth?.identity);
+  const role = auth?.identity?.role ?? null;
+  const authNavKey = isAuthenticated && role ? role : "anon";
+
+  const navItems = useMemo<readonly HeaderNavItem[]>(() => {
+    if (!isAuthenticated || !role) {
+      return [];
+    }
+    if (role === "ADMIN") {
+      return [
+        { to: "/admin", label: "Examinations", end: true },
+        { to: "/admin/exams/new", label: "Create Examination", end: false },
+      ];
+    }
+    return [{ to: "/student", label: "Examinations", end: true }];
+  }, [isAuthenticated, role]);
+
+  const userLabel =
+    auth?.identity?.display_name?.trim() ||
+    auth?.identity?.email?.trim() ||
+    "Signed in";
 
   // Sync popover attribute cleanly via setAttribute/removeAttribute (never IDL property)
   useLayoutEffect(() => {
     const menuEl = menuRef.current;
-    if (!menuEl || examFocusMode) {
+    if (!menuEl || examFocusMode || !isAuthenticated) {
+      setIsWide(false);
+      setIsMenuOpen(false);
       return;
     }
 
@@ -45,11 +79,13 @@ export function AppHeader({
     } else {
       menuEl.setAttribute("popover", "auto");
     }
-  }, [isWide, examFocusMode]);
+  }, [isWide, examFocusMode, isAuthenticated, authNavKey]);
 
   // Measure natural inline fit with ResizeObserver without layout thrashing
   useEffect(() => {
-    if (examFocusMode) {
+    lastCollapsedWidthRef.current = 0;
+
+    if (examFocusMode || !isAuthenticated) {
       return;
     }
 
@@ -111,12 +147,12 @@ export function AppHeader({
       window.cancelAnimationFrame(rafId);
       observer.disconnect();
     };
-  }, [examFocusMode]);
+  }, [examFocusMode, isAuthenticated, authNavKey]);
 
   // Track native popover toggle events to synchronize aria-expanded
   useEffect(() => {
     const menuEl = menuRef.current;
-    if (!menuEl || examFocusMode) {
+    if (!menuEl || examFocusMode || !isAuthenticated) {
       return;
     }
 
@@ -129,12 +165,12 @@ export function AppHeader({
     return () => {
       menuEl.removeEventListener("toggle", handleToggle);
     };
-  }, [examFocusMode]);
+  }, [examFocusMode, isAuthenticated, authNavKey]);
 
   // Close mobile popover cleanly after route selection
   useEffect(() => {
     const menuEl = menuRef.current;
-    if (!menuEl || isWide || examFocusMode) {
+    if (!menuEl || isWide || examFocusMode || !isAuthenticated) {
       return;
     }
     if (
@@ -143,7 +179,27 @@ export function AppHeader({
     ) {
       menuEl.hidePopover();
     }
-  }, [pathname, isWide, examFocusMode]);
+  }, [pathname, isWide, examFocusMode, isAuthenticated, authNavKey]);
+
+  const handleSignOut = async () => {
+    if (!auth || isSigningOut) {
+      return;
+    }
+    const menuEl = menuRef.current;
+    if (
+      menuEl &&
+      (menuEl.matches(":popover-open") || menuEl.classList.contains(":popover-open")) &&
+      typeof menuEl.hidePopover === "function"
+    ) {
+      menuEl.hidePopover();
+    }
+    setIsSigningOut(true);
+    try {
+      await auth.signOut();
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   if (examFocusMode) {
     return (
@@ -172,57 +228,75 @@ export function AppHeader({
       ref={headerRef}
       className={cn(
         "site-header sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-xs",
-        isWide && "is-wide",
+        isAuthenticated && isWide && "is-wide",
       )}
     >
       <div
         ref={innerRef}
-        className="header-inner mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6"
+        className="header-inner mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <NavLink
             to="/"
             className="inline-flex min-h-11 items-center gap-2.5 rounded-md px-1.5 text-base font-semibold tracking-tight text-foreground no-underline hover:text-primary"
           >
-            <span className="inline-flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <ShieldCheck className="size-4" aria-hidden="true" />
             </span>
             <span>Examination Hub</span>
           </NavLink>
-          <Badge variant="accent" className="hidden sm:inline-flex">
-            Assessment Portal
-          </Badge>
         </div>
 
-        <nav className="site-nav flex items-center" aria-label="Primary">
-          <button
-            type="button"
-            className="menu-button inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3.5 text-sm font-medium text-foreground hover:bg-muted"
-            aria-controls={menuId}
-            aria-expanded={isMenuOpen}
-            {...({
-              popovertarget: menuId,
-              popovertargetaction: "toggle",
-            } as Record<string, string>)}
-          >
-            <Menu className="size-4" aria-hidden="true" />
-            <span>Menu</span>
-          </button>
+        {isAuthenticated ? (
+          <nav className="site-nav flex items-center" aria-label="Primary">
+            <button
+              type="button"
+              className="menu-button inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3.5 text-sm font-medium text-foreground hover:bg-muted"
+              aria-controls={menuId}
+              aria-expanded={isMenuOpen}
+              popoverTarget={menuId}
+              popoverTargetAction="toggle"
+            >
+              <Menu className="size-4" aria-hidden="true" />
+              <span>Menu</span>
+            </button>
 
-          <ul ref={menuRef} id={menuId} className="site-menu list-none">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  className="nav-item-link flex min-h-11 items-center rounded-md border border-transparent px-3.5 py-2.5 text-sm font-medium text-foreground no-underline transition-colors hover:bg-muted"
+            <ul ref={menuRef} id={menuId} className="site-menu list-none">
+              {navItems.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    className="nav-item-link flex min-h-[44px] items-center rounded-md border border-transparent px-3.5 py-2.5 text-sm font-medium text-foreground no-underline transition-colors hover:bg-muted"
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+
+              <li className="border-t border-border px-3.5 py-2 text-xs text-muted-foreground [.site-header.is-wide_&]:ml-2 [.site-header.is-wide_&]:border-t-0 [.site-header.is-wide_&]:border-l [.site-header.is-wide_&]:py-1 [.site-header.is-wide_&]:pl-3.5">
+                <span
+                  className="block max-w-48 truncate font-medium text-foreground"
+                  title={userLabel}
                 >
-                  {item.label}
-                </NavLink>
+                  {userLabel}
+                </span>
               </li>
-            ))}
-          </ul>
-        </nav>
+
+              <li>
+                <button
+                  type="button"
+                  disabled={isSigningOut}
+                  onClick={() => void handleSignOut()}
+                  className="inline-flex min-h-[44px] w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 [.site-header.is-wide_&]:w-auto"
+                >
+                  <LogOut className="size-4" aria-hidden="true" />
+                  <span>{isSigningOut ? "Signing out..." : "Sign out"}</span>
+                </button>
+              </li>
+            </ul>
+          </nav>
+        ) : null}
       </div>
     </header>
   );

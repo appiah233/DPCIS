@@ -49,7 +49,7 @@ export interface ApiRequestOptions {
 const DEFAULT_TIMEOUT_MS = 10000;
 const HEALTH_TIMEOUT_MS = 5000;
 
-function extractFastApiErrorMessage(detail: unknown, fallbackStatus: number): string {
+function extractFastApiErrorMessage(detail: unknown): string {
   if (typeof detail === "string" && detail.trim()) {
     return detail.trim();
   }
@@ -95,7 +95,7 @@ function extractFastApiErrorMessage(detail: unknown, fallbackStatus: number): st
     }
   }
 
-  return `Backend responded with HTTP ${fallbackStatus}`;
+  return "We could not complete your request right now.";
 }
 
 function tryParseJson(rawText: string): unknown {
@@ -186,7 +186,7 @@ async function requestJson<T>(
         payload && typeof payload.code === "string" ? payload.code : undefined;
       const detail =
         payload && "detail" in payload ? payload.detail : parsedError;
-      const errorMessage = extractFastApiErrorMessage(detail, response.status);
+      const errorMessage = extractFastApiErrorMessage(detail);
       throw new ApiClientError(
         errorMessage,
         response.status,
@@ -213,7 +213,7 @@ async function requestJson<T>(
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiClientError("Request timed out or was cancelled.");
     }
-    throw new ApiClientError("Unable to connect to the backend service.");
+    throw new ApiClientError("Unable to connect to Examination Hub. Please check your connection and try again.");
   } finally {
     window.clearTimeout(timeoutId);
     options.signal?.removeEventListener("abort", onExternalAbort);

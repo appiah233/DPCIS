@@ -157,9 +157,9 @@ export function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administrator Workspace"
-        title="Examination Oversight"
-        description="Create draft examinations, parse bulk multiple-choice questions, control publication states, and review graded attempts."
+        eyebrow="Admin Dashboard"
+        title="Examinations"
+        description="Create examinations, add multiple-choice questions, manage Draft, Published, and Closed exams, and review student attempts and results."
         action={
           <>
             <Button
@@ -174,7 +174,7 @@ export function AdminDashboardPage() {
             <Button asChild>
               <Link to="/admin/exams/new">
                 <Plus className="size-4" aria-hidden="true" />
-                <span>Create New Exam</span>
+                <span>Create Examination</span>
               </Link>
             </Button>
           </>
@@ -196,7 +196,7 @@ export function AdminDashboardPage() {
       ) : null}
 
       {isLoading ? (
-        <LoadingStatePanel label="Loading administrator examinations..." cards={4} />
+        <LoadingStatePanel label="Loading examinations..." cards={4} />
       ) : errorMessage ? (
         <ErrorStatePanel
           title="Unable to load examinations"
@@ -221,7 +221,7 @@ export function AdminDashboardPage() {
             <Card>
               <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
                 <CardTitle as="h2" className="text-sm font-medium text-muted-foreground">
-                  Drafts
+                  Draft
                 </CardTitle>
                 <Pencil className="size-4 text-warning" aria-hidden="true" />
               </CardHeader>
@@ -258,12 +258,12 @@ export function AdminDashboardPage() {
           {exams.length === 0 ? (
             <EmptyStatePanel
               title="No examinations created yet"
-              description="Start by creating a draft examination, setting duration and pass mark rules, and importing MCQ blocks."
+              description="Start by creating a draft examination, setting timing and pass mark rules, and adding questions."
               action={
                 <Button asChild>
                   <Link to="/admin/exams/new">
                     <Plus className="size-4" aria-hidden="true" />
-                    <span>Create First Exam</span>
+                    <span>Create Examination</span>
                   </Link>
                 </Button>
               }
@@ -324,7 +324,7 @@ export function AdminDashboardPage() {
               {filteredExams.length === 0 ? (
                 <EmptyStatePanel
                   title="No examinations match your filters"
-                  description="Clear the search input or switch the lifecycle filter to view other examinations."
+                  description="Clear the search box or switch the status filter to view other examinations."
                   action={
                     <Button
                       type="button"
@@ -404,14 +404,14 @@ export function AdminDashboardPage() {
                           <div className="flex flex-wrap gap-2">
                             <Button asChild variant="outline" size="sm">
                               <Link to={`/admin/exams/${exam.id}`}>
-                                {exam.status === "DRAFT" ? "Edit Draft" : "Inspect"}
+                                {exam.status === "DRAFT" ? "Edit Draft" : "View Exam"}
                               </Link>
                             </Button>
 
                             <Button asChild variant="outline" size="sm">
                               <Link to={`/admin/exams/${exam.id}/results`}>
                                 <BarChart3 className="size-4" aria-hidden="true" />
-                                <span>Results</span>
+                                <span>Student Results</span>
                               </Link>
                             </Button>
 

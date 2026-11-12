@@ -1,15 +1,21 @@
 import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 from pydantic import SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 AppEnv = Literal["development", "test", "staging", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 _ALLOWED_PG_SCHEMES = {"postgres", "postgresql", "postgresql+psycopg"}
+_DISALLOWED_DEPLOYED_CORS_HOSTS = {
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "0.0.0.0",  # noqa: S104 (host denylist, not a socket bind)
+}
 
 
 class ConfigurationError(RuntimeError):
@@ -87,7 +93,10 @@ class Settings(BaseSettings):
     APP_ENV: AppEnv = "development"
     LOG_LEVEL: LogLevel = "INFO"
 
-    CORS_ORIGINS: list[str] = ["http://localhost:5173"]
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     DATABASE_URL: SecretStr | None = None
     DIRECT_DATABASE_URL: SecretStr | None = None
@@ -165,7 +174,7 @@ class Settings(BaseSettings):
                 )
             for origin in self.CORS_ORIGINS:
                 parsed = urlparse(origin)
-                if parsed.hostname in {"localhost", "127.0.0.1"} or parsed.scheme != "https":
+                if parsed.hostname in _DISALLOWED_DEPLOYED_CORS_HOSTS or parsed.scheme != "https":
                     raise ValueError(
                         f"CORS_ORIGINS in {self.APP_ENV!r} must use https:// non-localhost origins"
                     )

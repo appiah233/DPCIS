@@ -105,11 +105,11 @@ export function StudentHistorySection({ attempts }: StudentHistorySectionProps) 
 
               <TableCell label="Score">
                 {isInProgress ? (
-                  <span className="text-sm text-muted-foreground">Sitting active</span>
+                  <span className="text-sm text-muted-foreground">In progress</span>
                 ) : !attempt.result_visible ? (
                   <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                     <FileClock className="size-4 shrink-0" aria-hidden="true" />
-                    <span>Submitted — results pending</span>
+                    <span>Score not released</span>
                   </span>
                 ) : (
                   <div className="flex flex-wrap items-center justify-end gap-2 sm:justify-start">
@@ -149,9 +149,12 @@ export function StudentHistorySection({ attempts }: StudentHistorySectionProps) 
                     </Link>
                   </Button>
                 ) : (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Submitted — results pending
-                  </span>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to={`/student/results/${encodeURIComponent(attempt.attempt_id)}`}>
+                      <span>View Confirmation</span>
+                      <ArrowRight className="size-4" aria-hidden="true" />
+                    </Link>
+                  </Button>
                 )}
               </TableCell>
             </TableRow>

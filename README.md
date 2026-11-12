@@ -137,9 +137,9 @@ Never commit `.env`, `.env.local`, or real credentials.
    - Root overview: `.env.example`
    - Backend-only variables: `backend/.env.example`
    - Frontend public variables: `frontend/.env.example`
-2. Create local env files when running locally:
+2. Local development defaults work out of the box for `/health` and unauthenticated checks (`VITE_API_BASE_URL` defaults to `http://127.0.0.1:8000` when unset, and development `CORS_ORIGINS` allows both `http://localhost:5173` and `http://127.0.0.1:5173`, keeping explicit `VITE_API_BASE_URL` requests with no Vite proxy). When configuring database or Neon Managed Auth locally:
    - Copy `backend/.env.example` to `backend/.env`
-   - Copy `frontend/.env.example` to `frontend/.env.local`
+   - Put dev-only frontend overrides in `frontend/.env.development.local` (applies to `npm run dev` only, avoiding polluting local `npm run build` / `dist/`), or use gitignored `frontend/.env.local` strictly for public `VITE_*` frontend auth/API config when testing local `dev` and `preview` builds (never run `vercel deploy --prebuilt` locally while `frontend/.env.local` exists). In Vercel/production, configure `VITE_API_BASE_URL` explicitly in project environment variables.
 3. Only variables prefixed with `VITE_` are exposed to browser JavaScript bundles. Never place `DATABASE_URL`, `DIRECT_DATABASE_URL`, or server-only credentials into any `VITE_*` variable.
 
 ### Environment-Aware Backend Validation
@@ -161,8 +161,10 @@ python -m venv .venv
 pip install --upgrade pip
 pip install -r requirements.txt -r requirements-dev.txt
 
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+FastAPI binds loopback IPv4 (`http://127.0.0.1:8000`) for local `--reload` development, matching the frontend `VITE_API_BASE_URL` default and local `/health` checks.
 
 ### Frontend (from `frontend/`)
 
@@ -171,7 +173,7 @@ npm ci
 npm run dev
 ```
 
-Vite serves the frontend on `http://localhost:5173` by default.
+Vite serves the frontend on `http://localhost:5173` by default; local backend development `CORS_ORIGINS` permits both `http://localhost:5173` (primary) and `http://127.0.0.1:5173`.
 
 ---
 

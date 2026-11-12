@@ -74,11 +74,11 @@ export function AttemptDetailDialog({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={detail ? `Attempt Inspection — ${studentLabel}` : "Attempt Inspection"}
+      title={detail ? `Student Answers — ${studentLabel}` : "Review Student Answers"}
       description={
         detail
           ? `${detail.exam_title}${detail.student_email ? ` · ${detail.student_email}` : ""}`
-          : "Loading server-graded attempt breakdown."
+          : "Loading student answers and score breakdown..."
       }
       footer={
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -87,14 +87,14 @@ export function AttemptDetailDialog({
       }
     >
       {isLoading ? (
-        <div className="space-y-4 py-2" role="status" aria-label="Loading attempt details">
+        <div className="space-y-4 py-2" role="status" aria-label="Loading student answers">
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-28 w-full" />
         </div>
       ) : errorMessage ? (
         <ErrorStatePanel
-          title="Could not load attempt details"
+          title="Could not load student answers"
           message={errorMessage}
           onRetry={() => setReloadToken((n) => n + 1)}
         />
@@ -104,7 +104,7 @@ export function AttemptDetailDialog({
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={detail.status === "GRADED" ? "default" : "secondary"}>
-                  {detail.status}
+                  {detail.status === "GRADED" ? "Graded" : "In progress"}
                 </Badge>
                 {detail.status === "GRADED" ? (
                   detail.passed ? (
@@ -182,14 +182,19 @@ export function AttemptDetailDialog({
             <Alert variant="default">
               <AlertTitle>No questions recorded</AlertTitle>
               <AlertDescription>
-                This attempt contains no frozen question items.
+                No questions were recorded for this sitting.
               </AlertDescription>
             </Alert>
           ) : (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">
-                Question Breakdown ({detail.question_review.length})
-              </h3>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Review individual answers ({detail.question_review.length})
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Questions as presented during this sitting.
+                </p>
+              </div>
               <ol className="space-y-3">
                 {[...detail.question_review]
                   .sort((a, b) => a.display_order - b.display_order)
@@ -255,7 +260,7 @@ export function AttemptDetailDialog({
                                     </Badge>
                                   ) : null}
                                   {isCorrectOpt ? (
-                                    <Badge variant="success">Correct key</Badge>
+                                    <Badge variant="success">Correct answer</Badge>
                                   ) : null}
                                 </span>
                               </li>
