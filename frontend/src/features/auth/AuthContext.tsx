@@ -20,16 +20,51 @@ import type { AuthUser } from "@/lib/auth";
 
 export type { AuthContextValue };
 
-function resolveAuthErrorMessage(error: unknown): string {
+interface ResolvedAuthError {
+  message: string;
+  shouldSignOut: boolean;
+}
+
+function resolveAuthError(error: unknown): ResolvedAuthError {
   if (error instanceof ApiClientError) {
     if (error.status === 401) {
-      return "Your session has expired. Please sign in again.";
+      if (error.detail === "Authentication token expired") {
+        return {
+          message: "Your session has expired. Please sign in again.",
+          shouldSignOut: true,
+        };
+      }
+      if (
+        typeof error.detail === "string" &&
+        error.detail.startsWith("Application identity not found")
+      ) {
+        return {
+          message: "Your account has not been set up for Examination Hub. Please contact an administrator.",
+          shouldSignOut: false,
+        };
+      }
+      return {
+        message: "We could not validate your identity token. Please try signing in again.",
+        shouldSignOut: false,
+      };
+    }
+    if (error.status === 403) {
+      return {
+        message: "You do not have access to this workspace.",
+        shouldSignOut: false,
+      };
     }
     if (error.status === 503 || (error.status !== undefined && error.status >= 500)) {
-      return "Examination Hub is temporarily unavailable. Please try again shortly.";
+      return {
+        message: "Examination Hub is temporarily unavailable. Please try again shortly.",
+        shouldSignOut: false,
+      };
     }
   }
-  return "We could not verify your account right now. Please try again.";
+  return {
+    message: "We could not verify your account right now. Please try again.",
+    shouldSignOut: false,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -87,11 +122,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn("Authentication verification failed:", error);
       }
       setIdentity(null);
-      if (error instanceof ApiClientError && error.status === 401) {
+      const resolvedError = resolveAuthError(error);
+      if (resolvedError.shouldSignOut) {
         void signOutNeonAuth().catch(() => undefined);
         setSessionUser(null);
       }
-      setErrorMessage(resolveAuthErrorMessage(error));
+      setErrorMessage(resolvedError.message);
     } finally {
       if (requestSeq === requestSeqRef.current) {
         setIsLoading(false);
