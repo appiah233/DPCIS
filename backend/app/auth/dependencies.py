@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
+from urllib.parse import urlparse
 from uuid import UUID
 
 import jwt
@@ -39,6 +40,17 @@ def _clean_optional_claim(value: object) -> str | None:
     return cleaned or None
 
 
+def _managed_auth_issuer(base_url: str) -> str:
+    """Return the issuer used by Neon Managed Auth JWTs.
+
+    Neon exposes its Auth API below a branch-specific path such as
+    ``/neondb/auth``, while JWT ``iss`` is the URL origin. Configuration
+    validation already guarantees an absolute HTTPS URL.
+    """
+    parsed = urlparse(base_url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def require_identity(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     settings: Settings = Depends(get_settings),
@@ -69,7 +81,7 @@ def require_identity(
         }
         decode_kwargs: dict[str, object] = {
             "algorithms": ["EdDSA"],
-            "issuer": issuer.rstrip("/"),
+            "issuer": _managed_auth_issuer(issuer),
             "options": decode_options,
         }
         if settings.NEON_AUTH_AUDIENCE:
@@ -84,6 +96,12 @@ def require_identity(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication provider is temporarily unavailable",
+        ) from exc
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token expired",
+            headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     except (jwt.PyJWTError, OSError) as exc:
         raise HTTPException(
