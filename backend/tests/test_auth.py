@@ -199,6 +199,19 @@ def test_auth_me_rejects_invalid_eddsa_signature(monkeypatch: pytest.MonkeyPatch
         assert get_application_user_by_subject(db, "user-123") is None
 
 
+def test_auth_me_distinguishes_expired_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    token = _make_eddsa_token(private_key, exp_offset=-120)
+
+    test_client, _session_factory = _build_auth_test_app(monkeypatch, private_key.public_key())
+    with test_client as client:
+        response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+    assert response.headers.get("www-authenticate") == "Bearer"
+    assert response.json() == {"detail": "Authentication token expired"}
+
+
 @pytest.mark.parametrize(
     "token_overrides",
     [
@@ -256,6 +269,41 @@ def test_auth_me_rejects_hs256_and_alg_none_tokens(monkeypatch: pytest.MonkeyPat
             response = client.get("/auth/me", headers={"Authorization": f"Bearer {bad_token}"})
             assert response.status_code == 401
             assert response.headers.get("www-authenticate") == "Bearer"
+
+
+def test_require_identity_uses_auth_origin_as_managed_neon_issuer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Managed Neon tokens use the Auth URL origin even when the API has a path."""
+    private_key = Ed25519PrivateKey.generate()
+    token = _make_eddsa_token(
+        private_key,
+        sub="neon_path_issuer_user",
+        iss="https://auth.example.com",
+        aud=None,
+    )
+    monkeypatch.setattr(
+        auth_dependencies,
+        "_jwks_client",
+        lambda _url: SimpleNamespace(
+            get_signing_key_from_jwt=lambda _tok: SimpleNamespace(key=private_key.public_key())
+        ),
+    )
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="test",
+        CORS_ORIGINS=["http://localhost:5173"],
+        NEON_AUTH_BASE_URL="https://auth.example.com/neondb/auth",
+        NEON_AUTH_JWKS_URL="https://auth.example.com/neondb/auth/.well-known/jwks.json",
+        NEON_AUTH_AUDIENCE=None,
+    )
+
+    identity = require_identity(
+        credentials=SimpleNamespace(scheme="Bearer", credentials=token),  # type: ignore[arg-type]
+        settings=settings,
+    )
+
+    assert identity.subject == "neon_path_issuer_user"
 
 
 def test_auth_me_verifies_eddsa_token_provisions_student_and_ignores_jwt_role(
