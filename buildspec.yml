@@ -1,0 +1,133 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_REPO_NAME: "examination-hub-api"
+    PUSH_IMAGE: "false"
+    DEPLOY_VERCEL: "false"
+
+phases:
+  install:
+    runtime-versions:
+      python: "3.12"
+      nodejs: "22"
+    commands:
+      - python --version
+      - node --version
+      - npm --version
+      - python -m pip install --upgrade pip
+      - pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - cd frontend && npm ci && cd ..
+
+  pre_build:
+    commands:
+      - echo "Running template secret and Clerk hygiene scans..."
+      - |
+        if grep -rnEi "(npg_|postgres://|postgresql://|sk_live_|sk_test_|AKIA|ghp_|clerk)" \
+          .env.example backend/.env.example frontend/.env.example; then
+          echo "ERROR: Credential or Clerk reference found in .env.example template!"
+          exit 1
+        fi
+      - |
+        if grep -rnEi "(npg_|sk_live_|sk_test_|AKIA|ghp_|@clerk|VITE_CLERK|NEXT_PUBLIC_CLERK|CLERK_)" \
+          package.json package-lock.json \
+          backend/app backend/alembic backend/requirements.txt backend/requirements-dev.txt \
+          frontend/package.json frontend/package-lock.json frontend/index.html frontend/vercel.json frontend/src; then
+          echo "ERROR: Potential credential token or stale Clerk reference found in active source/config!"
+          exit 1
+        fi
+      - echo "Running backend lint, Alembic checks, and tests..."
+      - cd backend
+      - ruff check app tests alembic
+      - |
+        HEAD_COUNT=$(alembic heads | awk 'NF{c++} END{print c+0}')
+        alembic heads
+        if [ "${HEAD_COUNT}" -ne 1 ]; then
+          echo "ERROR: Expected exactly 1 Alembic head, found ${HEAD_COUNT}."
+          exit 1
+        fi
+        alembic history
+      - DATABASE_URL="postgresql+psycopg://offline@127.0.0.1:5432/offline" alembic upgrade head --sql > /dev/null
+      - pytest
+      - cd ..
+      - echo "Validating frontend config, lint, typecheck, and tests..."
+      - cd frontend
+      - node -e "JSON.parse(require('fs').readFileSync('vercel.json', 'utf8'))"
+      - npm run lint
+      - npm test --if-present
+      - cd ..
+      - |
+        if [ "${PUSH_IMAGE}" = "true" ]; then
+          if [ -z "${AWS_ACCOUNT_ID:-}" ] || [ -z "${AWS_DEFAULT_REGION:-}" ] || [ -z "${IMAGE_REPO_NAME:-}" ]; then
+            echo "ERROR: PUSH_IMAGE=true requires AWS_ACCOUNT_ID, AWS_DEFAULT_REGION, and IMAGE_REPO_NAME."
+            exit 1
+          fi
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+          echo "Logging in to Amazon ECR (${ECR_REGISTRY})..."
+          aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+        else
+          echo "PUSH_IMAGE is not 'true'; skipping ECR login and publish."
+        fi
+
+  build:
+    commands:
+      - echo "Building frontend production bundle..."
+      - cd frontend
+      - npm run build
+      - |
+        if grep -rnEi "(sk_live_|sk_test_|npg_|GOOGLE_CLIENT_SECRET|NEON_API_KEY|NEON_AUTH_JWKS_URL|DIRECT_DATABASE_URL|DATABASE_URL|postgres://|postgresql://|clerk)" dist/; then
+          echo "ERROR: Potential server secret or stale Clerk reference found in frontend build output!"
+          exit 1
+        fi
+      - cd ..
+      - echo "Building backend Docker image..."
+      - COMMIT_TAG="${CODEBUILD_RESOLVED_SOURCE_VERSION:-local}"
+      - IMAGE_TAG="$(printf '%s' "${COMMIT_TAG}" | cut -c1-12)"
+      - docker build -f backend/Dockerfile -t "${IMAGE_REPO_NAME}:${IMAGE_TAG}" -t "${IMAGE_REPO_NAME}:latest" backend/
+      - echo "Running backend container /health smoke check..."
+      - |
+        docker run -d --name api-smoke -p 8000:8000 "${IMAGE_REPO_NAME}:${IMAGE_TAG}"
+        trap 'docker rm -f api-smoke >/dev/null 2>&1 || true' EXIT
+        HEALTHY="false"
+        for i in $(seq 1 15); do
+          if curl -fsS http://127.0.0.1:8000/health | grep -q '"status":"healthy"'; then
+            echo "Container /health verified."
+            HEALTHY="true"
+            break
+          fi
+          sleep 1
+        done
+        if [ "${HEALTHY}" != "true" ]; then
+          docker logs api-smoke
+          exit 1
+        fi
+
+  post_build:
+    commands:
+      - |
+        if [ "${PUSH_IMAGE}" = "true" ]; then
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+          FULL_REPO="${ECR_REGISTRY}/${IMAGE_REPO_NAME}"
+          COMMIT_TAG="${CODEBUILD_RESOLVED_SOURCE_VERSION:-local}"
+          IMAGE_TAG="$(printf '%s' "${COMMIT_TAG}" | cut -c1-12)"
+          docker tag "${IMAGE_REPO_NAME}:${IMAGE_TAG}" "${FULL_REPO}:${IMAGE_TAG}"
+          docker push "${FULL_REPO}:${IMAGE_TAG}"
+          docker tag "${IMAGE_REPO_NAME}:latest" "${FULL_REPO}:latest"
+          docker push "${FULL_REPO}:latest"
+          printf '{"ImageURI":"%s:%s"}\n' "${FULL_REPO}" "${IMAGE_TAG}" > imageDetail.json
+        else
+          echo "Docker build succeeded; ECR push skipped because PUSH_IMAGE=${PUSH_IMAGE}."
+        fi
+      - |
+        if [ "${DEPLOY_VERCEL}" = "true" ]; then
+          if [ -z "${VERCEL_TOKEN:-}" ] || [ -z "${VERCEL_ORG_ID:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
+            echo "ERROR: DEPLOY_VERCEL=true requires VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID."
+            exit 1
+          fi
+          echo "Deploying frontend via Vercel CLI (prebuilt/production gated)..."
+          cd frontend
+          npx --yes vercel@latest deploy --prod --yes --token "${VERCEL_TOKEN}"
+          cd ..
+        else
+          echo "Vercel deployment skipped because DEPLOY_VERCEL=${DEPLOY_VERCEL}."
+        fi

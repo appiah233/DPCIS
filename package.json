@@ -1,0 +1,23 @@
+{
+  "name": "dpcis",
+  "version": "1.0.0",
+  "description": "> **Current Stage:** Foundation Only.\r > The backend and frontend skeletons, environment configuration boundaries, database migration infrastructure, Docker containerization, and CI foundation are in place. Full student examination workflows, Managed Auth role administration, question parsing, grading logic, and database schema migrations are intentionally deferred to upcoming milestones.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/appiah233/DPCIS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/appiah233/DPCIS/issues"
+  },
+  "homepage": "https://github.com/appiah233/DPCIS#readme",
+  "devDependencies": {
+    "@neon/config": "^1.14.0"
+  }
+}

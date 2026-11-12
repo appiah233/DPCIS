@@ -1,0 +1,25 @@
+# Ignore local secrets, caches, tests, and dev artifacts from Docker build context
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+htmlcov/
+*.db
+*.sqlite
+*.sqlite3
+tests/
+.git/
+.gitignore
+Dockerfile*
+.dockerignore
+*.md
