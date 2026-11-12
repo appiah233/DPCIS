@@ -81,9 +81,28 @@ phases:
         fi
       - cd ..
       - echo "Building backend Docker image..."
-      - COMMIT_TAG="${CODEBUILD_RESOLVED_SOURCE_VERSION:-local}"
-      - IMAGE_TAG="$(printf '%s' "${COMMIT_TAG}" | cut -c1-12)"
-      - docker build -f backend/Dockerfile -t "${IMAGE_REPO_NAME}:${IMAGE_TAG}" -t "${IMAGE_REPO_NAME}:latest" backend/
+      - |
+        COMMIT_TAG="${CODEBUILD_RESOLVED_SOURCE_VERSION:-}"
+        if [ -z "${COMMIT_TAG}" ]; then
+          if [ "${PUSH_IMAGE}" = "true" ]; then
+            echo "ERROR: PUSH_IMAGE=true requires CODEBUILD_RESOLVED_SOURCE_VERSION."
+            exit 1
+          fi
+          IMAGE_TAG="local"
+        elif ! printf '%s' "${COMMIT_TAG}" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+          if [ "${PUSH_IMAGE}" = "true" ]; then
+            echo "ERROR: CODEBUILD_RESOLVED_SOURCE_VERSION must be a 40-character Git commit SHA when PUSH_IMAGE=true."
+            exit 1
+          fi
+          IMAGE_TAG="local"
+        else
+          IMAGE_TAG="$(printf '%s' "${COMMIT_TAG}" | cut -c1-12 | tr '[:upper:]' '[:lower:]')"
+        fi
+        if [ -z "${IMAGE_TAG}" ]; then
+          echo "ERROR: Docker image tag is empty."
+          exit 1
+        fi
+        docker build -f backend/Dockerfile -t "${IMAGE_REPO_NAME}:${IMAGE_TAG}" backend/
       - echo "Running backend container /health smoke check..."
       - |
         docker run -d --name api-smoke -p 8000:8000 "${IMAGE_REPO_NAME}:${IMAGE_TAG}"
@@ -108,12 +127,18 @@ phases:
         if [ "${PUSH_IMAGE}" = "true" ]; then
           ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
           FULL_REPO="${ECR_REGISTRY}/${IMAGE_REPO_NAME}"
-          COMMIT_TAG="${CODEBUILD_RESOLVED_SOURCE_VERSION:-local}"
-          IMAGE_TAG="$(printf '%s' "${COMMIT_TAG}" | cut -c1-12)"
+          COMMIT_TAG="${CODEBUILD_RESOLVED_SOURCE_VERSION:-}"
+          if ! printf '%s' "${COMMIT_TAG}" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+            echo "ERROR: PUSH_IMAGE=true requires a valid 40-character CODEBUILD_RESOLVED_SOURCE_VERSION."
+            exit 1
+          fi
+          IMAGE_TAG="$(printf '%s' "${COMMIT_TAG}" | cut -c1-12 | tr '[:upper:]' '[:lower:]')"
+          if [ -z "${IMAGE_TAG}" ]; then
+            echo "ERROR: Immutable image tag is empty."
+            exit 1
+          fi
           docker tag "${IMAGE_REPO_NAME}:${IMAGE_TAG}" "${FULL_REPO}:${IMAGE_TAG}"
           docker push "${FULL_REPO}:${IMAGE_TAG}"
-          docker tag "${IMAGE_REPO_NAME}:latest" "${FULL_REPO}:latest"
-          docker push "${FULL_REPO}:latest"
           printf '{"ImageURI":"%s:%s"}\n' "${FULL_REPO}" "${IMAGE_TAG}" > imageDetail.json
         else
           echo "Docker build succeeded; ECR push skipped because PUSH_IMAGE=${PUSH_IMAGE}."
