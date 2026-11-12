@@ -88,7 +88,7 @@ export function StudentExamCard({ exam }: StudentExamCardProps) {
       <CardFooter className="justify-between">
         <span className="text-xs text-muted-foreground tabular-nums">
           {hasActiveAttempt
-            ? "Unfinished sitting ready to resume"
+            ? "Sitting in progress — ready to continue"
             : attemptsRemaining > 0
               ? `${attemptsRemaining} ${attemptsRemaining === 1 ? "attempt" : "attempts"} remaining`
               : "No attempts remaining"}

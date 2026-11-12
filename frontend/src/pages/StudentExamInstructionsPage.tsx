@@ -28,6 +28,7 @@ import {
 import {
   formatDecimalValue,
   formatDurationMinutes,
+  formatStudentErrorMessage,
 } from "@/features/student/formatters";
 import {
   getStudentExamDetail,
@@ -95,10 +96,10 @@ export function StudentExamInstructionsPage() {
         setState({
           status: "error",
           exam: null,
-          errorMessage:
-            error instanceof Error
-              ? error.message
-              : "Unable to load examination instructions.",
+          errorMessage: formatStudentErrorMessage(
+            error,
+            "Unable to load examination instructions.",
+          ),
         });
       });
 
@@ -121,9 +122,10 @@ export function StudentExamInstructionsPage() {
       navigate(`/student/attempts/${encodeURIComponent(started.attempt_id)}`);
     } catch (error) {
       setStartError(
-        error instanceof Error
-          ? error.message
-          : "Could not start the examination. Please try again.",
+        formatStudentErrorMessage(
+          error,
+          "Could not start the examination. Please try again.",
+        ),
       );
       startingLockRef.current = false;
       setIsStarting(false);
@@ -136,7 +138,7 @@ export function StudentExamInstructionsPage() {
         <PageHeader
           eyebrow="Examination Briefing"
           title="Loading Examination Details"
-          description="Retrieving examination rules and attempt availability from the server."
+          description="Loading examination details and instructions..."
           action={
             <Button asChild variant="outline">
               <Link to="/student">
@@ -229,7 +231,7 @@ export function StudentExamInstructionsPage() {
             ) : null}
           </div>
           <CardDescription>
-            Authoritative timing and grading are enforced on the server.
+            Your time limit and saved answers are tracked automatically throughout your sitting.
           </CardDescription>
         </CardHeader>
 
@@ -293,12 +295,12 @@ export function StudentExamInstructionsPage() {
                       Your answers are saved automatically as soon as you select an option.
                     </li>
                     <li>
-                      Refreshing or reopening the browser restores your saved answers, while the
-                      server deadline continues uninterrupted.
+                      Refreshing or reopening the browser restores your saved answers, while your
+                      exam timer continues uninterrupted.
                     </li>
                     <li>
-                      When time reaches zero, the server automatically locks and submits your
-                      recorded answers.
+                      When time reaches zero, your recorded answers are locked and submitted
+                      automatically.
                     </li>
                   </ul>
                 </AlertDescription>
@@ -314,7 +316,7 @@ export function StudentExamInstructionsPage() {
                   <AlertTitle>Score disclosure policy</AlertTitle>
                   <AlertDescription>
                     After you submit, you will receive confirmation that your examination was
-                    recorded. Numerical scores are withheld for this examination.
+                    recorded. Detailed scores are not shown for this examination.
                   </AlertDescription>
                 </div>
               </div>

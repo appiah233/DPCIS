@@ -41,6 +41,51 @@ export function createLocalQuestionKey(): string {
   return `q-${Date.now()}-${localKeyCounter}`;
 }
 
+const TECHNICAL_ERROR_PATTERN =
+  /\b(backend responded|http\s*\d{3}|status\s*(?:code\s*)?\d{3}|fastapi|postgres(?:ql)?|sqlalchemy|psycopg|neon|rbac|traceback|typeerror|referenceerror|syntaxerror|failed to fetch|networkerror|network error|timed out|timeout|econnrefused|json|endpoint|jwt|api)\b/i;
+
+function warnDevAdminError(context: string, raw: unknown): void {
+  if (import.meta.env.DEV) {
+    console.warn(`[Admin] ${context}`, raw);
+  }
+}
+
+export function sanitizeAdminErrorMessage(
+  rawMessage: string | null | undefined,
+  fallbackMessage: string,
+  status?: number,
+): string {
+  if (status !== undefined && status >= 500) {
+    warnDevAdminError(`Sanitized ${status} error:`, rawMessage);
+    return fallbackMessage;
+  }
+
+  if (status === 401 || status === 403) {
+    warnDevAdminError(`Sanitized ${status} auth error:`, rawMessage);
+    return "Your session has expired or you do not have administrator access.";
+  }
+
+  if (status === 404) {
+    return "The requested examination or record could not be found.";
+  }
+
+  const trimmed = rawMessage?.trim() ?? "";
+  if (!trimmed) {
+    return fallbackMessage;
+  }
+
+  if (trimmed.toLowerCase() === "exam failed validation") {
+    return "Please resolve the items below before publishing.";
+  }
+
+  if (TECHNICAL_ERROR_PATTERN.test(trimmed)) {
+    warnDevAdminError("Sanitized technical error message:", trimmed);
+    return fallbackMessage;
+  }
+
+  return trimmed;
+}
+
 export function extractAdminApiError(
   error: unknown,
   fallbackMessage = "Something went wrong. Please try again.",
@@ -52,24 +97,31 @@ export function extractAdminApiError(
       if (Array.isArray(rawErrors)) {
         for (const item of rawErrors) {
           if (typeof item === "string" && item.trim()) {
-            validationErrors.push(item.trim());
+            const sanitizedItem = sanitizeAdminErrorMessage(
+              item,
+              "Please review this item and try again.",
+            );
+            if (sanitizedItem) {
+              validationErrors.push(sanitizedItem);
+            }
           }
         }
       }
     }
     return {
-      message: error.message || fallbackMessage,
+      message: sanitizeAdminErrorMessage(error.message, fallbackMessage, error.status),
       validationErrors,
     };
   }
 
   if (error instanceof Error && error.message.trim()) {
     return {
-      message: error.message,
+      message: sanitizeAdminErrorMessage(error.message, fallbackMessage),
       validationErrors: [],
     };
   }
 
+  warnDevAdminError("Non-Error rejection:", error);
   return {
     message: fallbackMessage,
     validationErrors: [],

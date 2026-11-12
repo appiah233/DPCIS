@@ -1,22 +1,13 @@
-import {
-  Eye,
-  EyeOff,
-  KeyRound,
-  LogIn,
-  LogOut,
-  ShieldAlert,
-  ShieldCheck,
-  UserPlus,
-} from "lucide-react";
+import { Eye, EyeOff, LogIn, LogOut, RotateCcw, UserPlus } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { FormEvent } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -38,6 +29,46 @@ export interface AuthBoundaryProps {
   onAuthSuccess?: () => void | Promise<void>;
 }
 
+function extractRawErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error && typeof error === "object" && "message" in error) {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === "string") {
+      return maybeMessage;
+    }
+  }
+  return "";
+}
+
+function sanitizeAuthError(error: unknown, fallback: string): string {
+  if (import.meta.env.DEV) {
+    console.warn("Authentication request failed:", error);
+  }
+
+  const raw = extractRawErrorMessage(error);
+  if (/invalid.*(email|password|credential)|incorrect.*password|user not found/i.test(raw)) {
+    return "Incorrect email address or password.";
+  }
+  if (/already exists|already registered|duplicate/i.test(raw)) {
+    return "An account with this email address already exists.";
+  }
+  if (/password.*(short|length|least 8|weak)/i.test(raw)) {
+    return "Please use a password with at least 8 characters.";
+  }
+  if (/invalid email/i.test(raw)) {
+    return "Please enter a valid email address.";
+  }
+  if (/too many|rate limit/i.test(raw)) {
+    return "Too many sign-in attempts. Please wait a moment and try again.";
+  }
+  return fallback;
+}
+
 export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
   const sharedAuth = useOptionalAuth();
   const baseId = useId();
@@ -55,6 +86,14 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isConfigured = sharedAuth ? sharedAuth.isConfigured : isNeonAuthConfigured;
+
+  useEffect(() => {
+    if (!isConfigured && import.meta.env.DEV) {
+      console.warn("Authentication service is not configured for this environment.");
+    }
+  }, [isConfigured]);
+
   useEffect(() => {
     if (sharedAuth !== null || !isNeonAuthConfigured) {
       return;
@@ -67,9 +106,11 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
           setLocalUser(nextUser);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
-          setLocalError("Unable to restore the authentication session.");
+          setLocalError(
+            sanitizeAuthError(error, "We could not verify your session. Please try again."),
+          );
         }
       })
       .finally(() => {
@@ -83,24 +124,41 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
     };
   }, [sharedAuth]);
 
-  const isConfigured = sharedAuth ? sharedAuth.isConfigured : isNeonAuthConfigured;
   const user = sharedAuth ? sharedAuth.sessionUser : localUser;
-  const identity = sharedAuth ? sharedAuth.identity : null;
   const isLoading = sharedAuth ? sharedAuth.isLoading : localLoading;
   const displayError = localError ?? sharedAuth?.errorMessage ?? null;
 
+  const handleRetry = () => {
+    setLocalError(null);
+    if (sharedAuth) {
+      void sharedAuth.refreshAuth();
+      return;
+    }
+    window.location.reload();
+  };
+
   const handleGoogleSignIn = async () => {
-    if (!isConfigured) return;
+    if (!isConfigured) {
+      return;
+    }
     setLocalError(null);
     setIsSubmitting(true);
     try {
       const result = await signInWithGoogle();
       if (result.error) {
-        setLocalError(result.error.message ?? "Google sign-in could not be started.");
+        setLocalError(
+          sanitizeAuthError(
+            result.error,
+            "Google sign-in could not be started right now. Please try again.",
+          ),
+        );
       }
     } catch (error) {
       setLocalError(
-        error instanceof Error ? error.message : "Google sign-in could not be started.",
+        sanitizeAuthError(
+          error,
+          "Google sign-in could not be started right now. Please try again.",
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -108,7 +166,9 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
   };
 
   const handleSignOut = async () => {
-    if (!isConfigured) return;
+    if (!isConfigured) {
+      return;
+    }
     setLocalError(null);
     setIsSubmitting(true);
     try {
@@ -127,13 +187,18 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
     event.preventDefault();
     setLocalError(null);
     setIsSubmitting(true);
+    const fallbackError =
+      mode === "sign-up"
+        ? "We could not create your account right now. Please try again."
+        : "We could not sign you in right now. Please check your details and try again.";
+
     try {
       const result =
         mode === "sign-up"
           ? await signUpWithEmail(email.trim(), password, name.trim())
           : await signInWithEmail(email.trim(), password);
       if (result.error) {
-        setLocalError(result.error.message ?? "Email authentication failed.");
+        setLocalError(sanitizeAuthError(result.error, fallbackError));
         return;
       }
 
@@ -150,7 +215,7 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
         await onAuthSuccess();
       }
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Email authentication failed.");
+      setLocalError(sanitizeAuthError(error, fallbackError));
     } finally {
       setIsSubmitting(false);
     }
@@ -165,225 +230,246 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
   const emailInputId = `${baseId}-email`;
   const passwordInputId = `${baseId}-password`;
   const passwordHelpId = `${baseId}-password-help`;
+  const errorAlertId = `${baseId}-error`;
 
-  return (
-    <Card className="min-h-56">
-      <CardHeader className="flex-row items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 space-y-1">
-          <CardTitle as="h2">Neon Managed Auth</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Sign in with Google OAuth or email via Neon Managed Better Auth; application roles are
-            enforced on the backend.
-          </p>
-        </div>
-        {isConfigured ? (
-          <Badge variant="success">
-            <ShieldCheck className="size-3.5" aria-hidden="true" />
-            <span>{user ? "Signed in" : "Configured"}</span>
-          </Badge>
-        ) : (
-          <Badge variant="warning">
-            <ShieldAlert className="size-3.5" aria-hidden="true" />
-            <span>Awaiting Auth URL</span>
-          </Badge>
-        )}
-      </CardHeader>
+  if (!isConfigured) {
+    return (
+      <Card className="mx-auto w-full max-w-md">
+        <CardHeader className="space-y-1.5">
+          <CardTitle as="h2">Examination Hub is temporarily unavailable</CardTitle>
+          <CardDescription>
+            The authentication service has not been configured for this environment. Please contact
+            the system administrator.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button type="button" variant="outline" className="min-h-[44px] w-full" onClick={handleRetry}>
+            <RotateCcw className="size-4" aria-hidden="true" />
+            <span>Try Again</span>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
-      <CardContent className="space-y-4">
-        {!isConfigured ? (
-          <Alert variant="warning" role="status">
-            <div className="flex items-start gap-2.5">
-              <KeyRound className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <div>
-                <AlertTitle>Managed Auth URL not yet set</AlertTitle>
-                <AlertDescription>
-                  Set <code>VITE_NEON_AUTH_URL</code> in <code>frontend/.env.local</code> after
-                  enabling Managed Auth on the Neon branch. Protected routes remain locked until
-                  authentication is configured.
-                </AlertDescription>
-              </div>
-            </div>
+  if (isLoading) {
+    return (
+      <Card className="mx-auto w-full max-w-md">
+        <CardHeader className="space-y-1.5">
+          <CardTitle as="h2">Sign in to your account</CardTitle>
+          <CardDescription>Checking your session...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="default" role="status" aria-live="polite">
+            <AlertTitle>Checking your session</AlertTitle>
+            <AlertDescription>Please wait while we verify your account.</AlertDescription>
           </Alert>
-        ) : isLoading ? (
-          <Alert variant="default" role="status">
-            <AlertTitle>Restoring session</AlertTitle>
-            <AlertDescription>
-              Checking your Neon Managed Better Auth session and server role...
-            </AlertDescription>
-          </Alert>
-        ) : user ? (
-          <div className="space-y-4">
-            <Alert variant="success" role="status">
-              <AlertTitle>
-                Signed in as {identity?.email ?? user.email ?? identity?.display_name ?? user.name ?? "authenticated user"}
-              </AlertTitle>
-              <AlertDescription>
-                {identity ? (
-                  <span>
-                    Application role: <strong>{identity.role}</strong>. Bearer tokens are issued
-                    dynamically per API request.
-                  </span>
-                ) : (
-                  <span>
-                    Managed Better Auth keeps your session active and provides bearer tokens only
-                    for authenticated API requests.
-                  </span>
-                )}
-              </AlertDescription>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (user) {
+    return (
+      <Card className="mx-auto w-full max-w-md">
+        <CardHeader className="space-y-1.5">
+          <CardTitle as="h2">Signed in</CardTitle>
+          <CardDescription>
+            Signed in as {user.email ?? user.name ?? "your account"}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {displayError ? (
+            <Alert id={errorAlertId} variant="destructive" role="alert">
+              <AlertTitle>Unable to continue</AlertTitle>
+              <AlertDescription>{displayError}</AlertDescription>
             </Alert>
+          ) : null}
 
-            <div>
+          <div className="flex flex-col gap-2.5 sm:flex-row">
+            {displayError ? (
               <Button
                 type="button"
                 variant="outline"
-                size="default"
+                className="min-h-[44px] flex-1"
                 disabled={isSubmitting}
-                onClick={handleSignOut}
+                onClick={handleRetry}
               >
-                <LogOut className="size-4" aria-hidden="true" />
-                <span>Sign out</span>
+                <RotateCcw className="size-4" aria-hidden="true" />
+                <span>Try Again</span>
               </Button>
-            </div>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[44px] flex-1"
+              disabled={isSubmitting}
+              onClick={handleSignOut}
+            >
+              <LogOut className="size-4" aria-hidden="true" />
+              <span>Sign out</span>
+            </Button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <Alert variant="default" role="status">
-              <AlertTitle>
-                {mode === "sign-in" ? "Sign in to Examination Hub" : "Create an Examination Hub account"}
-              </AlertTitle>
-              <AlertDescription>
-                Use your email and password or continue with Google via Neon Managed Auth.
-              </AlertDescription>
-            </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
-            <form className="space-y-4" onSubmit={handleSubmitEmailAuth}>
-              {mode === "sign-up" ? (
-                <div className="field-group space-y-1.5">
-                  <Label htmlFor={nameInputId}>Full name</Label>
-                  <Input
-                    id={nameInputId}
-                    name="name"
-                    required
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    autoComplete="name"
-                    enterKeyHint="next"
-                  />
-                </div>
-              ) : null}
+  const emailDescribedBy = displayError ? errorAlertId : undefined;
+  const passwordDescribedBy =
+    [mode === "sign-up" ? passwordHelpId : null, displayError ? errorAlertId : null]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
-              <div className="field-group space-y-1.5">
-                <Label htmlFor={emailInputId}>Email address</Label>
-                <Input
-                  id={emailInputId}
-                  name="email"
-                  required
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="username"
-                  spellCheck={false}
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  enterKeyHint="next"
-                />
-              </div>
+  return (
+    <Card className="mx-auto w-full max-w-md">
+      <CardHeader className="space-y-1.5">
+        <CardTitle as="h2">
+          {mode === "sign-in" ? "Sign in to your account" : "Create your account"}
+        </CardTitle>
+        <CardDescription>
+          Use your email and password or institutional Google account to continue.
+        </CardDescription>
+      </CardHeader>
 
-              <div className="field-group space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor={passwordInputId}>Password</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="default"
-                    className="min-h-11 px-2.5 text-xs"
-                    aria-pressed={showPassword}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    onClick={() => setShowPassword((prev) => !prev)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" aria-hidden="true" />
-                    ) : (
-                      <Eye className="size-4" aria-hidden="true" />
-                    )}
-                    <span>{showPassword ? "Hide" : "Show"}</span>
-                  </Button>
-                </div>
-                <Input
-                  id={passwordInputId}
-                  name="password"
-                  required
-                  minLength={8}
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
-                  enterKeyHint="done"
-                  aria-describedby={mode === "sign-up" ? passwordHelpId : undefined}
-                />
-                {mode === "sign-up" ? (
-                  <p id={passwordHelpId} className="text-xs text-muted-foreground">
-                    Use at least 8 characters.
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                <Button type="submit" size="default" disabled={isSubmitting}>
-                  {mode === "sign-up" ? (
-                    <UserPlus className="size-4" aria-hidden="true" />
-                  ) : (
-                    <LogIn className="size-4" aria-hidden="true" />
-                  )}
-                  <span>
-                    {isSubmitting
-                      ? "Working..."
-                      : mode === "sign-up"
-                        ? "Create account"
-                        : "Sign in"}
-                  </span>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  disabled={isSubmitting}
-                  onClick={handleGoogleSignIn}
-                >
-                  <LogIn className="size-4" aria-hidden="true" />
-                  <span>Continue with Google</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="default"
-                  disabled={isSubmitting}
-                  onClick={toggleMode}
-                >
-                  {mode === "sign-up" ? "Already have an account?" : "Create an account"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        )}
-
+      <CardContent className="space-y-4">
         {displayError ? (
-          <Alert variant="destructive" role="alert">
-            <AlertTitle>Authentication error</AlertTitle>
+          <Alert id={errorAlertId} variant="destructive" role="alert">
+            <AlertTitle>Unable to sign in</AlertTitle>
             <AlertDescription>{displayError}</AlertDescription>
           </Alert>
         ) : null}
+
+        <form className="space-y-4" onSubmit={handleSubmitEmailAuth}>
+          {mode === "sign-up" ? (
+            <div className="field-group space-y-1.5">
+              <Label htmlFor={nameInputId}>Full name</Label>
+              <Input
+                id={nameInputId}
+                name="name"
+                required
+                className="min-h-[44px]"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoComplete="name"
+                enterKeyHint="next"
+                aria-invalid={Boolean(displayError)}
+                aria-describedby={emailDescribedBy}
+              />
+            </div>
+          ) : null}
+
+          <div className="field-group space-y-1.5">
+            <Label htmlFor={emailInputId}>Email</Label>
+            <Input
+              id={emailInputId}
+              name="email"
+              required
+              type="email"
+              className="min-h-[44px]"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="none"
+              enterKeyHint="next"
+              aria-invalid={Boolean(displayError)}
+              aria-describedby={emailDescribedBy}
+            />
+          </div>
+
+          <div className="field-group space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor={passwordInputId}>Password</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="default"
+                className="min-h-[44px] min-w-[44px] px-2.5 text-xs"
+                aria-pressed={showPassword}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="size-4" aria-hidden="true" />
+                )}
+                <span>{showPassword ? "Hide" : "Show"}</span>
+              </Button>
+            </div>
+            <Input
+              id={passwordInputId}
+              name="password"
+              required
+              minLength={8}
+              type={showPassword ? "text" : "password"}
+              className="min-h-[44px]"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
+              enterKeyHint="done"
+              aria-invalid={Boolean(displayError)}
+              aria-describedby={passwordDescribedBy}
+            />
+            {mode === "sign-up" ? (
+              <p id={passwordHelpId} className="text-xs text-muted-foreground">
+                Use at least 8 characters.
+              </p>
+            ) : null}
+          </div>
+
+          <Button type="submit" size="default" className="min-h-[44px] w-full" disabled={isSubmitting}>
+            {mode === "sign-up" ? (
+              <UserPlus className="size-4" aria-hidden="true" />
+            ) : (
+              <LogIn className="size-4" aria-hidden="true" />
+            )}
+            <span>
+              {isSubmitting
+                ? "Working..."
+                : mode === "sign-up"
+                  ? "Create account"
+                  : "Sign in"}
+            </span>
+          </Button>
+        </form>
+
+        <div className="relative flex items-center py-1" aria-hidden="true">
+          <div className="w-full border-t border-border" />
+          <span className="shrink-0 bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">
+            or
+          </span>
+          <div className="w-full border-t border-border" />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="default"
+          className="min-h-[44px] w-full"
+          disabled={isSubmitting}
+          onClick={handleGoogleSignIn}
+        >
+          <LogIn className="size-4" aria-hidden="true" />
+          <span>Continue with Google</span>
+        </Button>
       </CardContent>
 
-      <CardFooter className="justify-between">
-        <span className="text-xs text-muted-foreground">
-          Identity key: Managed Auth user ID (never an email address)
-        </span>
-        <span className="text-xs font-medium text-foreground">
-          Managed by Neon Auth (server-enforced RBAC)
-        </span>
+      <CardFooter className="justify-center pt-0">
+        <Button
+          type="button"
+          variant="ghost"
+          size="default"
+          className="min-h-[44px] w-full text-sm text-muted-foreground hover:text-foreground"
+          disabled={isSubmitting}
+          onClick={toggleMode}
+        >
+          {mode === "sign-up"
+            ? "Already have an account? Sign in"
+            : "Don't have an account? Create one"}
+        </Button>
       </CardFooter>
     </Card>
   );

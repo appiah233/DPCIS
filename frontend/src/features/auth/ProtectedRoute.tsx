@@ -1,8 +1,7 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { ErrorStatePanel, LoadingStatePanel } from "@/components/ui/state-panel";
-import { AuthBoundary } from "@/features/auth/AuthBoundary";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import { useAuth, useOptionalAuth } from "@/features/auth/useAuth";
 import type { AuthMeResponse } from "@/lib/api";
@@ -10,6 +9,7 @@ import type { AuthMeResponse } from "@/lib/api";
 export type ApplicationRole = AuthMeResponse["role"];
 
 function ProtectedRouteInner({ requiredRole }: { requiredRole: ApplicationRole }) {
+  const location = useLocation();
   const {
     isConfigured,
     isLoading,
@@ -22,37 +22,37 @@ function ProtectedRouteInner({ requiredRole }: { requiredRole: ApplicationRole }
 
   if (!isConfigured) {
     return (
-      <div className="mx-auto max-w-xl">
-        <AuthBoundary />
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <LoadingStatePanel
-        label="Checking authentication session and workspace role..."
-        cards={1}
+      <ErrorStatePanel
+        title="Examination Hub is temporarily unavailable"
+        message="The authentication service has not been configured for this environment. Please contact the system administrator."
+        onRetry={() => void refreshAuth()}
+        retryLabel="Try Again"
       />
     );
   }
 
+  if (isLoading) {
+    return <LoadingStatePanel label="Checking your session..." cards={1} />;
+  }
+
   if (!sessionUser) {
-    return (
-      <div className="mx-auto max-w-xl">
-        <AuthBoundary onAuthSuccess={refreshAuth} />
-      </div>
-    );
+    return <Navigate to="/" replace state={{ from: location.pathname }} />;
   }
 
   if (errorMessage || !identity) {
     return (
       <ErrorStatePanel
-        title="Unable to verify workspace access"
-        message={errorMessage ?? "Unable to load your application identity from the server."}
+        title="Unable to open your workspace"
+        message={errorMessage ?? "We could not verify your account right now. Please try again."}
         onRetry={() => void refreshAuth()}
+        retryLabel="Try Again"
         action={
-          <Button type="button" variant="outline" onClick={() => void signOut()}>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() => void signOut()}
+          >
             Sign out
           </Button>
         }
@@ -61,16 +61,22 @@ function ProtectedRouteInner({ requiredRole }: { requiredRole: ApplicationRole }
   }
 
   if (identity.role !== requiredRole) {
+    const safeHomePath = identity.role === "STUDENT" ? "/student" : "/admin";
     return (
       <ErrorStatePanel
-        title="Access restricted"
-        message={`This workspace requires the ${requiredRole} role. Your account currently holds the ${identity.role} role.`}
+        title="Access denied"
+        message="You do not have permission to view this page."
         action={
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link to="/">Return to overview</Link>
+            <Button asChild variant="outline" className="min-h-[44px]">
+              <Link to={safeHomePath}>Return to My Examinations</Link>
             </Button>
-            <Button type="button" variant="ghost" onClick={() => void signOut()}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-[44px]"
+              onClick={() => void signOut()}
+            >
               Sign out
             </Button>
           </div>

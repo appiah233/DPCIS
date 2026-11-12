@@ -92,7 +92,10 @@ export function BulkParserPanel({
       setParseResult(response);
     } catch (error) {
       setRequestError(
-        extractAdminApiError(error, "Unable to parse question text.").message,
+        extractAdminApiError(
+          error,
+          "We could not preview your questions right now. Please check your formatting and try again.",
+        ).message,
       );
     } finally {
       setIsParsing(false);
@@ -107,7 +110,7 @@ export function BulkParserPanel({
     const editable = items.map(fromParsedQuestion);
     onApplyQuestions(editable, mode);
     setAppliedBanner(
-      `${mode === "replace" ? "Replaced draft list with" : "Added"} ${editable.length} question${editable.length === 1 ? "" : "s"} in the editor below.${includeInvalidNote ? " Fix any highlighted blocks lacking a valid answer before saving." : " Review and click Save Questions to persist."}`,
+      `${mode === "replace" ? "Replaced question list with" : "Added"} ${editable.length} question${editable.length === 1 ? "" : "s"} below.${includeInvalidNote ? " Select a correct answer for any highlighted questions before saving." : " Review and click Save Questions when ready."}`,
     );
   };
 
@@ -159,36 +162,36 @@ export function BulkParserPanel({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <CardTitle as="h2" id={`${baseId}-heading`}>
-              Bulk Question Text Import &amp; Parser Preview
+              Paste Questions
             </CardTitle>
             <CardDescription>
-              Paste multiple-choice questions for deterministic server parsing and block-level
-              validation before saving to the draft. No answers are guessed automatically.
+              Paste multiple-choice questions below to preview them and catch formatting issues
+              before adding them to your exam. Missing answers are flagged for you to choose.
             </CardDescription>
           </div>
           <Badge variant="outline">
             <ClipboardPaste className="size-3.5" aria-hidden="true" />
-            <span>Stateless Preview</span>
+            <span>Preview only</span>
           </Badge>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5">
         <div className="rounded-lg border border-border bg-muted/40 p-3.5 text-xs leading-relaxed text-muted-foreground">
-          <p className="font-semibold text-foreground">Expected MCQ block format</p>
+          <p className="font-semibold text-foreground">Formatting guide</p>
           <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-foreground">
-            {`1. Question stem...\nA. Option A\nB. Option B\nC. Option C (optional)\nD. Option D (optional)\nANSWER: B`}
+            {`1. Question text...\nA. Option A\nB. Option B\nC. Option C (optional)\nD. Option D (optional)\nANSWER: B`}
           </pre>
           <p id={helpId} className="mt-2">
-            Also supports <code>1)</code>, <code>Q1:</code>, lowercase <code>a.</code>/<code>a)</code>,
-            and <code>Ans: X</code> / <code>Correct Answer: X</code>. Every block must have 2–4
-            sequential options starting at <code>A</code> and an explicit answer key.
+            Also accepts <code>1)</code>, <code>Q1:</code>, lowercase <code>a.</code>/<code>a)</code>,
+            and <code>Ans: X</code> or <code>Correct Answer: X</code>. Each question needs 2–4
+            options starting at <code>A</code> and a marked correct answer.
           </p>
         </div>
 
         <div className="field-group space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label htmlFor={textareaId}>Raw MCQ text</Label>
+            <Label htmlFor={textareaId}>Paste questions</Label>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -246,18 +249,18 @@ export function BulkParserPanel({
             onClick={() => void handleParse()}
           >
             <ListChecks className="size-4" aria-hidden="true" />
-            <span>{isParsing ? "Parsing..." : "Parse Questions"}</span>
+            <span>{isParsing ? "Previewing..." : "Preview Questions"}</span>
           </Button>
           {disabled ? (
             <span className="text-xs text-muted-foreground">
-              Bulk import is only available while the examination is in Draft status.
+              Adding pasted questions is only available while this examination is a Draft.
             </span>
           ) : null}
         </div>
 
         {requestError ? (
           <Alert variant="destructive" role="alert">
-            <AlertTitle>Parser request failed</AlertTitle>
+            <AlertTitle>Could not preview questions</AlertTitle>
             <AlertDescription>{requestError}</AlertDescription>
           </Alert>
         ) : null}
@@ -267,7 +270,7 @@ export function BulkParserPanel({
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <div>
-                <AlertTitle>Loaded into Question Editor</AlertTitle>
+                <AlertTitle>Questions added below</AlertTitle>
                 <AlertDescription>{appliedBanner}</AlertDescription>
               </div>
             </div>
@@ -277,14 +280,14 @@ export function BulkParserPanel({
         {parseResult ? (
           <div className="space-y-4 border-t border-border pt-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-base font-semibold text-foreground">Parse Preview</h3>
+              <h3 className="text-base font-semibold text-foreground">Question Preview</h3>
               <div className="flex flex-wrap gap-2" role="status">
-                <Badge variant="secondary">Total blocks: {parseResult.total_blocks}</Badge>
+                <Badge variant="secondary">Found: {parseResult.total_blocks}</Badge>
                 <Badge variant={parseResult.valid_count > 0 ? "success" : "secondary"}>
-                  Valid: {parseResult.valid_count}
+                  Ready: {parseResult.valid_count}
                 </Badge>
                 <Badge variant={parseResult.error_count > 0 ? "destructive" : "secondary"}>
-                  Errors: {parseResult.error_count}
+                  Needs attention: {parseResult.error_count}
                 </Badge>
               </div>
             </div>
@@ -295,21 +298,21 @@ export function BulkParserPanel({
                   <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
                   <div className="min-w-0 space-y-2">
                     <AlertTitle>
-                      Parser found {parseResult.error_count} validation issue
-                      {parseResult.error_count === 1 ? "" : "s"}
+                      {parseResult.error_count} question
+                      {parseResult.error_count === 1 ? "" : "s"} need attention
                     </AlertTitle>
                     <AlertDescription>
                       <p className="mb-2">
-                        Correct the text above and re-parse, or load blocks into the inline editor to
-                        assign missing answers manually.
+                        Fix the text above and preview again, or add these questions below to edit
+                        them directly.
                       </p>
                       <ul className="list-disc space-y-1 pl-5 break-words">
                         {parseResult.errors.map((err, index) => (
                           <li key={`${err.block_index}-${index}`}>
                             <strong>
                               {err.block_index === 0
-                                ? "Input"
-                                : `Question block #${err.block_index}`}
+                                ? "Formatting"
+                                : `Question #${err.block_index}`}
                               :
                             </strong>{" "}
                             {err.message}
@@ -325,10 +328,13 @@ export function BulkParserPanel({
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <div>
-                    <AlertTitle>All {parseResult.valid_count} blocks parsed cleanly</AlertTitle>
+                    <AlertTitle>
+                      {parseResult.valid_count} question
+                      {parseResult.valid_count === 1 ? "" : "s"} ready to add
+                    </AlertTitle>
                     <AlertDescription>
-                      Review the preview cards below, then append or replace them in your draft
-                      question list.
+                      Review the preview below, then add these questions to your exam or replace
+                      your current list.
                     </AlertDescription>
                   </div>
                 </div>
@@ -348,7 +354,7 @@ export function BulkParserPanel({
                         }
                       >
                         <FilePlus2 className="size-4" aria-hidden="true" />
-                        <span>Append valid ({parseResult.valid_questions.length})</span>
+                        <span>Add ready questions ({parseResult.valid_questions.length})</span>
                       </Button>
 
                       <Button
@@ -358,7 +364,9 @@ export function BulkParserPanel({
                         onClick={handleReplaceValidClick}
                       >
                         <Replace className="size-4" aria-hidden="true" />
-                        <span>Replace list with valid ({parseResult.valid_questions.length})</span>
+                        <span>
+                          Replace list with ready questions ({parseResult.valid_questions.length})
+                        </span>
                       </Button>
                     </>
                   ) : null}
@@ -378,7 +386,7 @@ export function BulkParserPanel({
                     >
                       <Wrench className="size-4" aria-hidden="true" />
                       <span>
-                        Append invalid ({parseResult.invalid_questions.length}) to fix inline
+                        Add questions needing fixes ({parseResult.invalid_questions.length})
                       </span>
                     </Button>
                   ) : null}
@@ -391,7 +399,7 @@ export function BulkParserPanel({
                       disabled={disabled}
                       onClick={handleImportAllWithFixes}
                     >
-                      <span>Replace list with all ({orderedBlocks.length}) &amp; fix inline</span>
+                      <span>Replace list with all ({orderedBlocks.length}) to edit</span>
                     </Button>
                   ) : null}
                 </div>
@@ -411,21 +419,21 @@ export function BulkParserPanel({
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Parsed Block #{block.position}
+                            Question #{block.position}
                           </span>
                           <div className="flex flex-wrap gap-1.5">
                             {block.valid ? (
                               <Badge variant="success">
                                 <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                                <span>Valid · Answer {block.answer_label}</span>
+                                <span>Ready · Answer {block.answer_label}</span>
                               </Badge>
                             ) : (
                               <Badge variant="destructive">
                                 <AlertTriangle className="size-3.5" aria-hidden="true" />
                                 <span>
                                   {missingAnswer
-                                    ? "Invalid · No answer key"
-                                    : `Invalid (${block.errors.length})`}
+                                    ? "Needs attention · Missing answer"
+                                    : `Needs attention (${block.errors.length})`}
                                 </span>
                               </Badge>
                             )}
@@ -434,7 +442,7 @@ export function BulkParserPanel({
 
                         <p className="mt-2 break-words text-sm font-medium text-foreground">
                           {block.question_text || (
-                            <em className="text-destructive">(Empty question stem)</em>
+                            <em className="text-destructive">(Missing question text)</em>
                           )}
                         </p>
 
@@ -478,8 +486,7 @@ export function BulkParserPanel({
       </CardContent>
 
       <CardFooter className="text-xs text-muted-foreground">
-        Parsing previews questions only — nothing is saved until you click Save Questions in the
-        editor below.
+        Previewing does not save changes yet — click Save Questions below when you are ready.
       </CardFooter>
 
       <ConfirmDialog
@@ -489,8 +496,8 @@ export function BulkParserPanel({
             setConfirmReplaceMode(null);
           }
         }}
-        title="Replace current draft questions?"
-        description={`This will replace the ${existingQuestionCount} question${existingQuestionCount === 1 ? "" : "s"} currently loaded in the editor. Changes are still unsaved until you click Save Questions.`}
+        title="Replace current questions?"
+        description={`This will replace the ${existingQuestionCount} question${existingQuestionCount === 1 ? "" : "s"} currently in your editor. Nothing is saved until you click Save Questions.`}
         confirmLabel="Replace questions"
         confirmVariant="destructive"
         onConfirm={handleConfirmReplace}

@@ -20,6 +20,18 @@ import type { AuthUser } from "@/lib/auth";
 
 export type { AuthContextValue };
 
+function resolveAuthErrorMessage(error: unknown): string {
+  if (error instanceof ApiClientError) {
+    if (error.status === 401) {
+      return "Your session has expired. Please sign in again.";
+    }
+    if (error.status === 503 || (error.status !== undefined && error.status >= 500)) {
+      return "Examination Hub is temporarily unavailable. Please try again shortly.";
+    }
+  }
+  return "We could not verify your account right now. Please try again.";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(isNeonAuthConfigured);
   const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
@@ -44,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const requestSeq = ++requestSeqRef.current;
 
     setIsLoading(true);
+    setIdentity(null);
     setErrorMessage(null);
 
     try {
@@ -70,17 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (requestSeq !== requestSeqRef.current || controller.signal.aborted) {
         return;
       }
+      if (import.meta.env.DEV) {
+        console.warn("Authentication verification failed:", error);
+      }
       setIdentity(null);
       if (error instanceof ApiClientError && error.status === 401) {
+        void signOutNeonAuth().catch(() => undefined);
         setSessionUser(null);
-        setErrorMessage("Your session could not be verified. Please sign in again.");
-      } else {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to verify your application identity.",
-        );
       }
+      setErrorMessage(resolveAuthErrorMessage(error));
     } finally {
       if (requestSeq === requestSeqRef.current) {
         setIsLoading(false);

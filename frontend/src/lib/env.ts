@@ -10,7 +10,13 @@ export interface PublicEnvConfig {
  */
 export function getPublicEnvConfig(): PublicEnvConfig {
   const rawApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ?? "";
-  const apiBaseUrl = (rawApiBase || "http://localhost:8000").replace(/\/+$/, "");
+  const isLocalOrigin =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "[::1]";
+  const apiBaseUrl = (
+    rawApiBase || (isLocalOrigin ? "http://127.0.0.1:8000" : "/api")
+  ).replace(/\/+$/, "");
 
   const rawNeonAuthUrl =
     (import.meta.env.VITE_NEON_AUTH_URL as string | undefined)?.trim() ?? "";

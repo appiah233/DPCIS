@@ -27,6 +27,7 @@ import {
   formatDateTime,
   formatDecimalValue,
   formatPercentage,
+  formatStudentErrorMessage,
   formatSubmissionReason,
 } from "@/features/student/formatters";
 import { getAttemptResult } from "@/features/student/studentApi";
@@ -97,17 +98,20 @@ export function StudentResultPage() {
           setState({
             status: "in_progress",
             result: null,
-            errorMessage: error.message,
+            errorMessage: formatStudentErrorMessage(
+              error,
+              "Submit your active examination before viewing your result.",
+            ),
           });
           return;
         }
         setState({
           status: "error",
           result: null,
-          errorMessage:
-            error instanceof Error
-              ? error.message
-              : "Unable to load examination result.",
+          errorMessage: formatStudentErrorMessage(
+            error,
+            "Unable to load examination result.",
+          ),
         });
       });
 
@@ -122,7 +126,7 @@ export function StudentResultPage() {
         <PageHeader
           eyebrow="Examination Result"
           title="Loading Attempt Summary"
-          description="Retrieving finalized grading details from the server."
+          description="Loading your examination summary..."
           action={
             <Button asChild variant="outline">
               <Link to="/student">
@@ -206,7 +210,7 @@ export function StudentResultPage() {
       <PageHeader
         eyebrow="Examination Outcome"
         title={result.exam_title}
-        description="Official server-recorded summary for your examination sitting."
+        description="Official summary for your completed examination sitting."
         action={
           <Button asChild variant="outline">
             <Link to="/student">
@@ -285,7 +289,7 @@ export function StudentResultPage() {
                 <div className="space-y-1">
                   <CardTitle as="h2">Graded Score Summary</CardTitle>
                   <CardDescription>
-                    Pass mark required: {formatDecimalValue(result.pass_mark)}%
+                    Pass mark: {formatDecimalValue(result.pass_mark)}%
                   </CardDescription>
                 </div>
 
@@ -391,7 +395,7 @@ export function StudentResultPage() {
                   Question Review
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Review your submitted selections alongside the verified answer key.
+                  Review your selected answers alongside the correct answers.
                 </p>
               </div>
 
@@ -406,9 +410,9 @@ export function StudentResultPage() {
               <div className="flex items-start gap-2.5">
                 <Info className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div>
-                  <AlertTitle>Answer-key review not shown</AlertTitle>
+                  <AlertTitle>Question review unavailable</AlertTitle>
                   <AlertDescription>
-                    Detailed question-by-question answer keys are hidden for this examination.
+                    Correct answers and question review are not shown for this examination.
                   </AlertDescription>
                 </div>
               </div>

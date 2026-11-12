@@ -160,12 +160,12 @@ export function QuestionListEditor({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle as="h2" id={`${baseId}-heading`}>
-              Questions &amp; Answer Keys ({questions.length})
+              Questions &amp; Correct Answers ({questions.length})
             </CardTitle>
             <CardDescription>
               {readOnly
-                ? `Read-only question bank (${formatDecimal(totalPoints)} total points).`
-                : `Review, reorder, or edit questions inline before saving (${formatDecimal(totalPoints)} total points).`}
+                ? `Saved questions (${formatDecimal(totalPoints)} total points).`
+                : `Review, reorder, or edit questions before saving (${formatDecimal(totalPoints)} total points).`}
             </CardDescription>
           </div>
 
@@ -176,13 +176,21 @@ export function QuestionListEditor({
             {missingCorrectCount > 0 && !readOnly ? (
               <Badge variant="destructive">
                 <AlertTriangle className="size-3.5" aria-hidden="true" />
-                <span>{missingCorrectCount} missing answer key</span>
+                <span>{missingCorrectCount} missing correct answer</span>
               </Badge>
             ) : null}
             {readOnly ? (
               <Badge variant="secondary">
                 <Lock className="size-3.5" aria-hidden="true" />
-                <span>Locked ({examStatus})</span>
+                <span>
+                  Locked (
+                  {examStatus === "PUBLISHED"
+                    ? "Published"
+                    : examStatus === "CLOSED"
+                      ? "Closed"
+                      : "Draft"}
+                  )
+                </span>
               </Badge>
             ) : null}
           </div>
@@ -202,7 +210,7 @@ export function QuestionListEditor({
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <div>
-                <AlertTitle>Questions saved to draft</AlertTitle>
+                <AlertTitle>Questions saved</AlertTitle>
                 <AlertDescription>{saveSuccessMessage}</AlertDescription>
               </div>
             </div>
@@ -213,8 +221,8 @@ export function QuestionListEditor({
           <Alert variant="destructive" role="alert">
             <AlertTitle>Please resolve highlighted question issues before saving</AlertTitle>
             <AlertDescription>
-              Every question requires stem text, valid points, 2–4 distinct non-empty options, and
-              exactly one selected correct answer.
+              Every question requires question text, valid points, 2–4 distinct non-empty options,
+              and one selected correct answer.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -245,8 +253,8 @@ export function QuestionListEditor({
             title="No questions in this examination yet"
             description={
               readOnly
-                ? "This examination contains no recorded questions."
-                : "Use the bulk MCQ parser above or click Add Question to author items manually."
+                ? "This examination contains no saved questions."
+                : "Paste questions in the box above or click Add Question to create one manually."
             }
             action={
               !readOnly ? (
@@ -372,7 +380,7 @@ export function QuestionListEditor({
                     <div className="mt-4 space-y-4">
                       {question.parserErrors && question.parserErrors.length > 0 ? (
                         <Alert variant="warning" role="status">
-                          <AlertTitle>Imported from invalid parser block</AlertTitle>
+                          <AlertTitle>Needs review from pasted text</AlertTitle>
                           <AlertDescription>
                             <ul className="list-disc pl-5 text-xs">
                               {question.parserErrors.map((err, i) => (
@@ -394,7 +402,7 @@ export function QuestionListEditor({
                             aria-invalid={
                               showValidation && !question.question_text.trim()
                             }
-                            placeholder="Enter question stem..."
+                            placeholder="Enter question text..."
                             onChange={(event) => {
                               const nextText = event.target.value;
                               updateQuestionAt(qIndex, (q) => ({

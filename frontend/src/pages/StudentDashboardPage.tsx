@@ -13,6 +13,7 @@ import {
 import { useOptionalAuth } from "@/features/auth/useAuth";
 import { StudentExamCard } from "@/features/student/StudentExamCard";
 import { StudentHistorySection } from "@/features/student/StudentHistorySection";
+import { formatStudentErrorMessage } from "@/features/student/formatters";
 import {
   listAvailableExams,
   listStudentAttempts,
@@ -73,10 +74,10 @@ export function StudentDashboardPage() {
         setState((prev) => ({
           ...prev,
           status: "error",
-          errorMessage:
-            error instanceof Error
-              ? error.message
-              : "Unable to load your examinations right now.",
+          errorMessage: formatStudentErrorMessage(
+            error,
+            "Unable to load your examinations right now.",
+          ),
         }));
       });
 
@@ -104,9 +105,9 @@ export function StudentDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow={studentLabel ? `Student Workspace · ${studentLabel}` : "Student Workspace"}
-        title="Available Examinations"
-        description="Start a published examination, resume an unfinished sitting, or review your submitted results."
+        eyebrow="Examination Hub"
+        title={studentLabel ? `Welcome, ${studentLabel}` : "Welcome"}
+        description="Find your next examination, continue where you left off, and view your results."
         action={
           <Button
             type="button"
@@ -133,8 +134,11 @@ export function StudentDashboardPage() {
 
       {state.status === "error" ? (
         <ErrorStatePanel
-          title="Could not load student workspace"
-          message={state.errorMessage ?? "An unexpected error occurred while contacting the server."}
+          title="Could not load your examinations"
+          message={
+            state.errorMessage ??
+            "We could not load your examinations right now. Please try again."
+          }
           onRetry={handleRefresh}
         />
       ) : null}
@@ -147,11 +151,11 @@ export function StudentDashboardPage() {
                 <div className="flex items-start gap-3">
                   <Clock className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
                   <div className="min-w-0 space-y-1">
-                    <AlertTitle>Examination sitting in progress</AlertTitle>
+                    <AlertTitle>Examination in progress</AlertTitle>
                     <AlertDescription>
-                      You have an active sitting for{" "}
-                      <span className="font-semibold">{resumeExamTitle}</span>. Your server timer
-                      continues running until submitted or expired.
+                      Your examination for{" "}
+                      <span className="font-semibold">{resumeExamTitle}</span> is still in progress.
+                      Time continues until you submit or it runs out.
                     </AlertDescription>
                   </div>
                 </div>
@@ -171,14 +175,14 @@ export function StudentDashboardPage() {
               id="published-exams-heading"
               className="text-lg font-semibold tracking-tight text-foreground sm:text-xl"
             >
-              Published Examinations
+              Available Examinations
             </h2>
 
             {state.exams.length === 0 ? (
               <EmptyStatePanel
                 icon={<BookOpenCheck className="size-5" aria-hidden="true" />}
-                title="No published examinations right now"
-                description="When an instructor publishes an examination for students, it will appear here."
+                title="No available examinations right now"
+                description="When an examination is available for you, it will appear here."
               />
             ) : (
               <div className="card-grid">
@@ -194,7 +198,7 @@ export function StudentDashboardPage() {
               id="attempt-history-heading"
               className="text-lg font-semibold tracking-tight text-foreground sm:text-xl"
             >
-              Attempt History
+              Completed Examinations
             </h2>
 
             <StudentHistorySection attempts={state.attempts} />

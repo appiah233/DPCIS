@@ -27,6 +27,24 @@ def _apply_security_headers(response: Response, request_id: str) -> Response:
     return response
 
 
+_OUTER_API_ROOT_PATHS = frozenset({
+    "/api/health",
+    "/api/auth/me",
+    "/api/docs",
+    "/api/redoc",
+    "/api/openapi.json",
+})
+
+
+def _strip_api_prefix(request: Request) -> None:
+    """Make Vercel's public /api mount transparent without breaking /api/* routers."""
+    path = request.scope["path"]
+    if path in {"/api", "/api/"}:
+        request.scope["path"] = "/"
+    elif path in _OUTER_API_ROOT_PATHS or path.startswith("/api/api/"):
+        request.scope["path"] = path[4:]
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the Examination Hub FastAPI application."""
     resolved_settings = settings or get_settings()
@@ -48,6 +66,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = resolved_settings
     if settings is not None:
         app.dependency_overrides[get_settings] = lambda: resolved_settings
+
+    @app.middleware("http")
+    async def normalize_service_prefix(request: Request, call_next):
+        _strip_api_prefix(request)
+        return await call_next(request)
 
     @app.middleware("http")
     async def attach_request_context_and_security_headers(request: Request, call_next):

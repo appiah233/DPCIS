@@ -131,11 +131,11 @@ export function AdminExamResultsPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          eyebrow="Results Oversight"
-          title="Loading Examination Results"
-          description="Fetching server-computed aggregate metrics and student attempts..."
+          eyebrow="Student Results"
+          title="Loading Student Results"
+          description="Loading score summary and student attempts..."
         />
-        <LoadingStatePanel label="Loading examination results..." cards={4} />
+        <LoadingStatePanel label="Loading student results..." cards={4} />
       </div>
     );
   }
@@ -144,20 +144,20 @@ export function AdminExamResultsPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          eyebrow="Results Oversight"
+          eyebrow="Student Results"
           title="Results Unavailable"
           description="Could not retrieve results for this examination."
           action={
             <Button asChild variant="outline">
               <Link to="/admin">
                 <ArrowLeft className="size-4" aria-hidden="true" />
-                <span>Back to Dashboard</span>
+                <span>Back to Examinations</span>
               </Link>
             </Button>
           }
         />
         <ErrorStatePanel
-          title="Could not load examination results"
+          title="Could not load student results"
           message={errorMessage ?? "Examination results not found."}
           onRetry={triggerReload}
         />
@@ -171,9 +171,9 @@ export function AdminExamResultsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Results Oversight"
+        eyebrow="Student Results"
         title={results.exam_title}
-        description={`Pass mark: ${formatDecimal(results.pass_mark, "%")} · Total recorded attempts: ${results.total_attempts}`}
+        description={`Pass mark: ${formatDecimal(results.pass_mark, "%")} · Total attempts: ${results.total_attempts}`}
         action={
           <>
             <Button
@@ -196,17 +196,18 @@ export function AdminExamResultsPage() {
             <Button asChild variant="outline">
               <Link to="/admin">
                 <ArrowLeft className="size-4" aria-hidden="true" />
-                <span>Dashboard</span>
+                <span>Examinations</span>
               </Link>
             </Button>
           </>
         }
       />
 
-      <section
-        aria-label="Summary metrics"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
-      >
+      <section aria-labelledby="score-summary-heading" className="space-y-3">
+        <h2 id="score-summary-heading" className="text-base font-semibold text-foreground">
+          Score Summary
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle as="h2" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -271,16 +272,17 @@ export function AdminExamResultsPage() {
             </p>
           </CardContent>
         </Card>
+        </div>
       </section>
 
       {results.attempts.length === 0 ? (
         <EmptyStatePanel
           title="No student attempts yet"
-          description="Summary metrics and candidate attempt breakdowns will populate automatically once students begin this examination."
+          description="Score summary metrics and student attempt details will appear automatically once students begin this examination."
         />
       ) : (
         <section aria-labelledby="attempts-list-heading" className="space-y-4">
-          <h2 id="attempts-list-heading" className="visually-hidden">
+          <h2 id="attempts-list-heading" className="text-base font-semibold text-foreground">
             Student Attempts
           </h2>
           {!hasCompleted ? (
@@ -288,8 +290,8 @@ export function AdminExamResultsPage() {
               <AlertTitle>No graded attempts completed yet</AlertTitle>
               <AlertDescription>
                 {results.total_attempts} attempt{results.total_attempts === 1 ? " is" : "s are"}{" "}
-                currently in progress. Aggregate percentages will appear once attempts are
-                submitted or expire.
+                currently in progress. Average, highest, lowest, and pass rates will appear once
+                students finish their attempts.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -382,7 +384,7 @@ export function AdminExamResultsPage() {
 
                       <TableCell label="Status">
                         <Badge variant={isGraded ? "default" : "secondary"}>
-                          {row.status}
+                          {isGraded ? "Graded" : "In progress"}
                         </Badge>
                       </TableCell>
 
@@ -435,7 +437,7 @@ export function AdminExamResultsPage() {
                           onClick={() => setInspectedAttemptId(row.attempt_id)}
                         >
                           <Eye className="size-4" aria-hidden="true" />
-                          <span>Inspect Attempt</span>
+                          <span>Review Answers</span>
                         </Button>
                       </TableCell>
                     </TableRow>

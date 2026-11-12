@@ -47,6 +47,7 @@ export function AdminExamEditorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [activeSection, setActiveSection] = useState<"overview" | "questions" | "settings">("overview");
 
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -130,7 +131,7 @@ export function AdminExamEditorPage() {
       const updated = await updateAdminExam(exam.id, payload);
       setExam((prev) => (prev ? { ...prev, ...updated } : null));
       setSettingsDirty(false);
-      setSettingsSuccess("Draft examination configuration saved.");
+      setSettingsSuccess("Exam settings saved.");
     } catch (error) {
       setSettingsError(
         extractAdminApiError(error, "Unable to save examination settings.").message,
@@ -167,11 +168,11 @@ export function AdminExamEditorPage() {
       setQuestions(mapped);
       setSavedQuestionsSig(computeQuestionsSignature(mapped));
       setQuestionsSuccess(
-        `Saved ${updated.questions.length} question${updated.questions.length === 1 ? "" : "s"} to draft.`,
+        `Saved ${updated.questions.length} question${updated.questions.length === 1 ? "" : "s"}.`,
       );
     } catch (error) {
       setQuestionsError(
-        extractAdminApiError(error, "Unable to save questions to draft.").message,
+        extractAdminApiError(error, "Unable to save questions.").message,
       );
     } finally {
       setIsSavingQuestions(false);
@@ -196,8 +197,8 @@ export function AdminExamEditorPage() {
       setLifecycleError({
         message: "Save your pending settings or question edits before publishing.",
         validationErrors: [
-          ...(settingsDirty ? ["Unsaved changes exist in Settings & Delivery Rules."] : []),
-          ...(questionsDirty ? ["Unsaved changes exist in Questions & Answer Keys."] : []),
+          ...(settingsDirty ? ["Save your exam settings before publishing."] : []),
+          ...(questionsDirty ? ["Save your questions before publishing."] : []),
         ],
       });
       return;
@@ -219,17 +220,17 @@ export function AdminExamEditorPage() {
         const published = await publishAdminExam(exam.id);
         setExam((prev) => (prev ? { ...prev, ...published } : null));
         setLifecycleSuccess(
-          "Examination published. Students can now view instructions and start attempts.",
+          "Examination published. Students can now view instructions and begin attempts.",
         );
       } else if (lifecycleAction === "close") {
         const closed = await closeAdminExam(exam.id);
         setExam((prev) => (prev ? { ...prev, ...closed } : null));
         setLifecycleSuccess(
-          "Examination closed. New attempts are blocked and historical records remain preserved.",
+          "Examination closed. New student attempts are disabled, and existing results remain available.",
         );
       } else if (lifecycleAction === "delete") {
         await deleteAdminExam(exam.id);
-        navigate("/admin", { replace: true });
+        navigate("/admin/exams", { replace: true });
         return;
       }
       setLifecycleAction(null);
@@ -247,11 +248,11 @@ export function AdminExamEditorPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          eyebrow="Administrator Workspace"
+          eyebrow="Admin Dashboard"
           title="Loading Examination"
-          description="Fetching examination configuration and questions..."
+          description="Loading exam settings and questions..."
         />
-        <LoadingStatePanel label="Loading examination editor..." cards={2} />
+        <LoadingStatePanel label="Loading examination..." cards={2} />
       </div>
     );
   }
@@ -260,14 +261,14 @@ export function AdminExamEditorPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          eyebrow="Administrator Workspace"
+          eyebrow="Admin Dashboard"
           title="Examination Unavailable"
-          description="We could not retrieve this examination record."
+          description="We could not open this examination."
           action={
             <Button asChild variant="outline">
-              <Link to="/admin">
+              <Link to="/admin/exams">
                 <ArrowLeft className="size-4" aria-hidden="true" />
-                <span>Back to Dashboard</span>
+                <span>Back to Examinations</span>
               </Link>
             </Button>
           }
@@ -284,22 +285,22 @@ export function AdminExamEditorPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Examination Management"
+        eyebrow="Examinations"
         title={exam.title}
         description={`${exam.duration_minutes} minutes · Pass mark ${exam.pass_mark}% · ${exam.question_count} saved question${exam.question_count === 1 ? "" : "s"}`}
         action={
           <>
             <Button asChild variant="outline">
-              <Link to="/admin">
+              <Link to="/admin/exams">
                 <ArrowLeft className="size-4" aria-hidden="true" />
-                <span>Dashboard</span>
+                <span>Examinations</span>
               </Link>
             </Button>
 
             <Button asChild variant="outline">
               <Link to={`/admin/exams/${exam.id}/results`}>
                 <BarChart3 className="size-4" aria-hidden="true" />
-                <span>Results</span>
+                <span>Student Results</span>
               </Link>
             </Button>
 
@@ -363,13 +364,13 @@ export function AdminExamEditorPage() {
             <div>
               <AlertTitle>
                 {exam.status === "PUBLISHED"
-                  ? "Examination is live and read-only"
-                  : "Examination is closed and archived"}
+                  ? "Examination is published and locked"
+                  : "Examination is closed"}
               </AlertTitle>
               <AlertDescription>
                 {exam.status === "PUBLISHED"
-                  ? "Settings and questions cannot be edited after publication so active student attempts and grading keys stay consistent. You may close the exam or review results at any time."
-                  : "Closed examinations cannot be edited or reopened, preserving historical attempts and grades."}
+                  ? "Published examinations cannot be edited so active student attempts and grading stay consistent. You can close the exam or review student results at any time."
+                  : "Closed examinations cannot be edited or reopened, keeping existing student attempts and results intact."}
               </AlertDescription>
             </div>
           </div>
@@ -401,13 +402,41 @@ export function AdminExamEditorPage() {
           <div className="flex items-start gap-2.5">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <div>
-              <AlertTitle>Lifecycle updated</AlertTitle>
+              <AlertTitle>Examination status updated</AlertTitle>
               <AlertDescription>{lifecycleSuccess}</AlertDescription>
             </div>
           </div>
         </Alert>
       ) : null}
 
+      <nav aria-label="Examination editor sections" className="flex flex-wrap gap-2 border-b border-border pb-3">
+        {(["overview", "questions", "settings"] as const).map((section) => (
+          <Button
+            key={section}
+            type="button"
+            variant={activeSection === section ? "default" : "ghost"}
+            aria-current={activeSection === section ? "page" : undefined}
+            onClick={() => setActiveSection(section)}
+          >
+            {section === "overview" ? "Overview" : section === "questions" ? `Questions (${questions.length})` : "Settings"}
+          </Button>
+        ))}
+        <Button asChild variant="ghost">
+          <Link to={`/admin/exams/${exam.id}/results`}>Results</Link>
+        </Button>
+      </nav>
+
+      {activeSection === "overview" ? (
+        <section aria-label="Examination overview" className="grid gap-4 rounded-lg border border-border bg-card p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div><p className="text-sm text-muted-foreground">Status</p><p className="mt-1 font-semibold"><ExamStatusBadge status={exam.status} /></p></div>
+          <div><p className="text-sm text-muted-foreground">Questions</p><p className="mt-1 text-xl font-semibold tabular-nums">{exam.question_count}</p></div>
+          <div><p className="text-sm text-muted-foreground">Time allowed</p><p className="mt-1 text-xl font-semibold tabular-nums">{exam.duration_minutes} min</p></div>
+          <div><p className="text-sm text-muted-foreground">Attempts allowed</p><p className="mt-1 text-xl font-semibold tabular-nums">{exam.max_attempts}</p></div>
+          {exam.status === "DRAFT" ? <p className="sm:col-span-2 lg:col-span-4 text-sm text-muted-foreground">Prepare the questions and settings, then publish when this examination is ready for students.</p> : null}
+        </section>
+      ) : null}
+
+      <div hidden={activeSection !== "settings"}>
       <ExamSettingsForm
         mode="edit"
         exam={exam}
@@ -419,7 +448,9 @@ export function AdminExamEditorPage() {
         onDirtyChange={setSettingsDirty}
         onSubmit={handleSaveSettings}
       />
+      </div>
 
+      <div hidden={activeSection !== "questions"} className="space-y-6">
       {!isReadOnly ? (
         <BulkParserPanel
           disabled={isReadOnly}
@@ -444,6 +475,7 @@ export function AdminExamEditorPage() {
         onSave={handleSaveQuestions}
         onDiscard={handleDiscardQuestions}
       />
+      </div>
 
       <ConfirmDialog
         open={lifecycleAction !== null}
@@ -461,9 +493,9 @@ export function AdminExamEditorPage() {
         }
         description={
           lifecycleAction === "publish"
-            ? `Publishing "${exam.title}" makes it available to eligible students and permanently locks settings and questions to protect attempt integrity.`
+            ? `Publishing "${exam.title}" makes it available to students and locks its settings and questions so every student takes the same exam.`
             : lifecycleAction === "close"
-              ? `Closing "${exam.title}" prevents students from starting new attempts. Previously recorded attempts and results remain available.`
+              ? `Closing "${exam.title}" prevents students from starting new attempts. Existing student attempts and results remain available.`
               : `Permanently delete draft "${exam.title}" and all saved draft questions?`
         }
         confirmLabel={
