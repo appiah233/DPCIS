@@ -12,7 +12,7 @@ import { useHealthCheck } from "@/hooks/useHealthCheck";
 const REASSURANCE_ITEMS = [
   "Calm, focused single-question experience",
   "Answers saved automatically as you work",
-  "Clear countdown timer throughout your sitting",
+  "Clear countdown timer during your examination",
   "Results shown when permitted by your administrator",
 ] as const;
 
@@ -71,7 +71,7 @@ export function OverviewPage() {
             Examination Hub
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            A focused and secure place to take your examinations.
+            A secure and focused place to take your examinations and view your results.
           </p>
         </header>
 
@@ -100,7 +100,7 @@ export function OverviewPage() {
           Examination Hub
         </h1>
         <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-          A focused and secure place to take your examinations.
+          A secure and focused place to take your examinations and view your results.
         </p>
       </header>
 

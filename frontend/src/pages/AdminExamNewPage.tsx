@@ -37,7 +37,7 @@ export function AdminExamNewPage() {
         description="Set the title, timing, pass mark, and student result settings. You can add or paste questions on the next screen."
         action={
           <Button asChild variant="outline">
-            <Link to="/admin">
+            <Link to="/admin/exams">
               <ArrowLeft className="size-4" aria-hidden="true" />
               <span>Back to Examinations</span>
             </Link>

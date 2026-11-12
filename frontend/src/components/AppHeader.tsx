@@ -52,8 +52,9 @@ export function AppHeader({
     }
     if (role === "ADMIN") {
       return [
-        { to: "/admin", label: "Examinations", end: true },
-        { to: "/admin/exams/new", label: "Create Examination", end: false },
+        { to: "/admin", label: "Overview", end: true },
+        { to: "/admin/exams", label: "Examinations", end: true },
+        { to: "/admin/results", label: "Results", end: true },
       ];
     }
     return [{ to: "/student", label: "Examinations", end: true }];

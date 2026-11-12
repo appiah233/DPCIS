@@ -105,9 +105,9 @@ export function StudentDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Student Dashboard"
+        eyebrow="Examination Hub"
         title={studentLabel ? `Welcome, ${studentLabel}` : "Welcome"}
-        description="Start an available examination, continue an unfinished sitting, or review your permitted results."
+        description="Find your next examination, continue where you left off, and view your results."
         action={
           <Button
             type="button"
@@ -151,11 +151,11 @@ export function StudentDashboardPage() {
                 <div className="flex items-start gap-3">
                   <Clock className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
                   <div className="min-w-0 space-y-1">
-                    <AlertTitle>Continue Existing Attempt</AlertTitle>
+                    <AlertTitle>Examination in progress</AlertTitle>
                     <AlertDescription>
-                      You have an active sitting for{" "}
-                      <span className="font-semibold">{resumeExamTitle}</span>. Your exam timer
-                      continues running until you submit or time runs out.
+                      Your examination for{" "}
+                      <span className="font-semibold">{resumeExamTitle}</span> is still in progress.
+                      Time continues until you submit or it runs out.
                     </AlertDescription>
                   </div>
                 </div>
@@ -198,7 +198,7 @@ export function StudentDashboardPage() {
               id="attempt-history-heading"
               className="text-lg font-semibold tracking-tight text-foreground sm:text-xl"
             >
-              Completed Examinations &amp; Results
+              Completed Examinations
             </h2>
 
             <StudentHistorySection attempts={state.attempts} />

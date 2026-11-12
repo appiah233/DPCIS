@@ -47,6 +47,7 @@ export function AdminExamEditorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [activeSection, setActiveSection] = useState<"overview" | "questions" | "settings">("overview");
 
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -229,7 +230,7 @@ export function AdminExamEditorPage() {
         );
       } else if (lifecycleAction === "delete") {
         await deleteAdminExam(exam.id);
-        navigate("/admin", { replace: true });
+        navigate("/admin/exams", { replace: true });
         return;
       }
       setLifecycleAction(null);
@@ -265,7 +266,7 @@ export function AdminExamEditorPage() {
           description="We could not open this examination."
           action={
             <Button asChild variant="outline">
-              <Link to="/admin">
+              <Link to="/admin/exams">
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 <span>Back to Examinations</span>
               </Link>
@@ -290,7 +291,7 @@ export function AdminExamEditorPage() {
         action={
           <>
             <Button asChild variant="outline">
-              <Link to="/admin">
+              <Link to="/admin/exams">
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 <span>Examinations</span>
               </Link>
@@ -408,6 +409,34 @@ export function AdminExamEditorPage() {
         </Alert>
       ) : null}
 
+      <nav aria-label="Examination editor sections" className="flex flex-wrap gap-2 border-b border-border pb-3">
+        {(["overview", "questions", "settings"] as const).map((section) => (
+          <Button
+            key={section}
+            type="button"
+            variant={activeSection === section ? "default" : "ghost"}
+            aria-current={activeSection === section ? "page" : undefined}
+            onClick={() => setActiveSection(section)}
+          >
+            {section === "overview" ? "Overview" : section === "questions" ? `Questions (${questions.length})` : "Settings"}
+          </Button>
+        ))}
+        <Button asChild variant="ghost">
+          <Link to={`/admin/exams/${exam.id}/results`}>Results</Link>
+        </Button>
+      </nav>
+
+      {activeSection === "overview" ? (
+        <section aria-label="Examination overview" className="grid gap-4 rounded-lg border border-border bg-card p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div><p className="text-sm text-muted-foreground">Status</p><p className="mt-1 font-semibold"><ExamStatusBadge status={exam.status} /></p></div>
+          <div><p className="text-sm text-muted-foreground">Questions</p><p className="mt-1 text-xl font-semibold tabular-nums">{exam.question_count}</p></div>
+          <div><p className="text-sm text-muted-foreground">Time allowed</p><p className="mt-1 text-xl font-semibold tabular-nums">{exam.duration_minutes} min</p></div>
+          <div><p className="text-sm text-muted-foreground">Attempts allowed</p><p className="mt-1 text-xl font-semibold tabular-nums">{exam.max_attempts}</p></div>
+          {exam.status === "DRAFT" ? <p className="sm:col-span-2 lg:col-span-4 text-sm text-muted-foreground">Prepare the questions and settings, then publish when this examination is ready for students.</p> : null}
+        </section>
+      ) : null}
+
+      <div hidden={activeSection !== "settings"}>
       <ExamSettingsForm
         mode="edit"
         exam={exam}
@@ -419,7 +448,9 @@ export function AdminExamEditorPage() {
         onDirtyChange={setSettingsDirty}
         onSubmit={handleSaveSettings}
       />
+      </div>
 
+      <div hidden={activeSection !== "questions"} className="space-y-6">
       {!isReadOnly ? (
         <BulkParserPanel
           disabled={isReadOnly}
@@ -444,6 +475,7 @@ export function AdminExamEditorPage() {
         onSave={handleSaveQuestions}
         onDiscard={handleDiscardQuestions}
       />
+      </div>
 
       <ConfirmDialog
         open={lifecycleAction !== null}

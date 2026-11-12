@@ -1,9 +1,5 @@
 import {
   BarChart3,
-  BookOpenCheck,
-  FileText,
-  Lock,
-  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -15,7 +11,6 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -157,9 +152,9 @@ export function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Admin Dashboard"
+        eyebrow="Examination management"
         title="Examinations"
-        description="Create examinations, add multiple-choice questions, manage Draft, Published, and Closed exams, and review student attempts and results."
+        description="Find, prepare, and manage your examinations."
         action={
           <>
             <Button
@@ -205,56 +200,6 @@ export function AdminDashboardPage() {
         />
       ) : (
         <>
-          <section aria-label="Examination counts" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle as="h2" className="text-sm font-medium text-muted-foreground">
-                  Total Examinations
-                </CardTitle>
-                <FileText className="size-4 text-muted-foreground" aria-hidden="true" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums text-foreground">{counts.all}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle as="h2" className="text-sm font-medium text-muted-foreground">
-                  Draft
-                </CardTitle>
-                <Pencil className="size-4 text-warning" aria-hidden="true" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums text-foreground">{counts.draft}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle as="h2" className="text-sm font-medium text-muted-foreground">
-                  Published
-                </CardTitle>
-                <BookOpenCheck className="size-4 text-success" aria-hidden="true" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums text-foreground">{counts.published}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle as="h2" className="text-sm font-medium text-muted-foreground">
-                  Closed
-                </CardTitle>
-                <Lock className="size-4 text-muted-foreground" aria-hidden="true" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums text-foreground">{counts.closed}</p>
-              </CardContent>
-            </Card>
-          </section>
-
           {exams.length === 0 ? (
             <EmptyStatePanel
               title="No examinations created yet"

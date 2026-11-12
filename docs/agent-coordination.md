@@ -28,6 +28,15 @@
 
 ## 2. Active Workstream Coordination Ledger
 
+### Product completion handoff — 2026-11-12
+
+| WORKSTREAM | OWNER | STATUS | FILES/DIRECTORIES | DEPENDENCIES | LAST UPDATE | BLOCKER | HANDOFF NOTES |
+|---|---|---|---|---|---|---|---|
+| Admin product information architecture | ArchitectAgent, ProductAgent, DesignAgent | IMPLEMENTED; browser review pending | `frontend/src/App.tsx`, `frontend/src/components/AppHeader.tsx`, `frontend/src/pages/AdminOverviewPage.tsx`, `AdminDashboardPage.tsx`, `AdminResultsPage.tsx`, `AdminExamEditorPage.tsx`, `AdminExamNewPage.tsx` | Existing admin API | 2026-11-12 | Live authenticated browser session may be unavailable | `/admin` is an operational overview; `/admin/exams` is the searchable directory; `/admin/results` selects an exam and loads real aggregate results on demand; editor separates overview, questions, and settings while keeping unsaved form state mounted. Candidate directory and persisted settings are omitted because the backend has no corresponding APIs. |
+| Student product copy | ArchitectAgent | IMPLEMENTED; browser review pending | `frontend/src/pages/StudentDashboardPage.tsx` | Existing student API | 2026-11-12 | Live authenticated browser session may be unavailable | Clarified dashboard introduction, resume wording, and completed-examination heading. Existing timer, autosave, result policy, and server authority are untouched. |
+| Independent product verification | TestingVerificationAgent | PARTIAL | Read-only frontend/backend gates and browser review | Product UI edits | 2026-11-12 | CUA browser `getState` timed out twice; no rendered screenshots or keyboard verification | `npm ci --ignore-scripts`, lint/TypeScript, and production build exited 0. Ruff, pytest (workspace temp), Alembic heads/history, and offline PostgreSQL SQL compilation exited 0. Rendered mobile/desktop, authenticated E2E, and keyboard journeys remain unverified for these UI changes. |
+
+
 | WORKSTREAM | OWNER | STATUS | FILES/DIRECTORIES | DEPENDENCIES | LAST UPDATE | BLOCKER | HANDOFF NOTES |
 |---|---|---|---|---|---|---|---|
 | **Architecture & Ledger Governance** | `ArchitectAgent` | `VERIFIED` | `docs/agent-coordination.md`, `AGENTS.md`, `GEMINI.md`, `backend/app/main.py`, `vercel.json` | Cline `vercel.json` gateway compat; UI/UX + Neon Auth remediation | 2026-11-12 | None | Scoped Cline's `_strip_api_prefix` in `backend/app/main.py` (`/` root/health/auth + `/api/api/*` prefix normalization only) so Vercel `/api` gateway rewrites work while keeping `/api/{admin,exams,attempts,student}/*` routers intact (`248` pytest passing). |
