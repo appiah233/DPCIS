@@ -234,7 +234,12 @@ export function AppHeader({
     >
       <div
         ref={innerRef}
-        className="header-inner mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6"
+        className={cn(
+          "header-inner mx-auto flex min-h-16 items-center justify-between gap-3 sm:gap-4",
+          pathname === "/" && !isAuthenticated
+            ? "max-w-none px-6 sm:px-10 lg:px-14"
+            : "max-w-6xl px-4 sm:px-6",
+        )}
       >
         <div className="flex min-w-0 items-center gap-3">
           <NavLink
