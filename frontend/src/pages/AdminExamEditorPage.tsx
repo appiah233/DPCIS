@@ -453,6 +453,7 @@ export function AdminExamEditorPage() {
       <div hidden={activeSection !== "questions"} className="space-y-6">
       {!isReadOnly ? (
         <BulkParserPanel
+          examId={exam.id}
           disabled={isReadOnly}
           existingQuestionCount={questions.length}
           onApplyQuestions={handleApplyParsedQuestions}

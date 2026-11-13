@@ -283,6 +283,11 @@ class ExamPublish(BaseModel):
 
 class QuestionCreate(BaseModel):
     question_text: str = Field(min_length=1)
+    source_file_id: UUID | None = None
+    source_number: int | None = Field(default=None, ge=1)
+    pdf_options_text: dict[str, str] = Field(default_factory=dict)
+    pdf_warnings: list[str] = Field(default_factory=list)
+    pdf_confidence: Decimal | None = None
     position: int | None = Field(default=None, ge=0)
     points: Decimal = Field(
         default=Decimal("1.00"),
@@ -346,6 +351,13 @@ class SaveQuestionsRequest(BaseModel):
 class QuestionAdminOut(BaseModel):
     id: UUID
     question_text: str
+    source_file_id: UUID | None = None
+    source_number: int | None = None
+    image_urls: list[str] = Field(default_factory=list)
+    image_regions: list[dict] = Field(default_factory=list)
+    pdf_options_text: dict[str, str] = Field(default_factory=dict)
+    pdf_warnings: list[str] = Field(default_factory=list)
+    pdf_confidence: Decimal | None = None
     position: int
     points: Decimal
     options: list[QuestionOptionAdminOut] = Field(default_factory=list)
@@ -364,6 +376,13 @@ class ParsedOption(QuestionOptionBase):
 
 class ParsedQuestion(BaseModel):
     question_text: str
+    source_file_id: UUID | None = None
+    source_number: int | None = None
+    image_urls: list[str] = Field(default_factory=list)
+    image_regions: list[dict] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    pdf_options_text: dict[str, str] = Field(default_factory=dict)
+    pdf_confidence: Decimal | None = None
     position: int
     points: Decimal = Decimal("1.00")
     options: list[ParsedOption]
@@ -389,6 +408,25 @@ class ParseQuestionsResponse(BaseModel):
     total_blocks: int = 0
     valid_count: int = 0
     error_count: int = 0
+    normalized_answer_key: str | None = None
+    page_dimensions: list[tuple[float, float]] = Field(default_factory=list)
+    ocr_used: bool = False
+
+
+class CropRegionInput(BaseModel):
+    page: int = Field(ge=1)
+    bbox: tuple[float, float, float, float]
+
+
+class CropUpdateRequest(BaseModel):
+    regions: list[CropRegionInput] = Field(min_length=1, max_length=20)
+    dpi: int = Field(default=200, ge=72, le=300)
+    padding: float = Field(default=0.0, ge=0, le=30)
+
+
+class CropUpdateResponse(BaseModel):
+    regions: list[CropRegionInput]
+    image_urls: list[str]
 
 
 ExamWithQuestionsAdmin.model_rebuild()

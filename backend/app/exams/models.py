@@ -154,6 +154,15 @@ class Question(Base):
         nullable=False,
     )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    source_file_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(as_uuid=True), ForeignKey("exam_source_files.id"), nullable=True
+    )
+    source_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    image_regions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_paths: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pdf_options_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pdf_warnings: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pdf_confidence: Mapped[Decimal | None] = mapped_column(Numeric(3, 2), nullable=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     points: Mapped[Decimal] = mapped_column(
         Numeric(5, 2),
@@ -195,6 +204,23 @@ class Question(Base):
         CheckConstraint("points > 0", name=conv("ck_questions_points_positive")),
         Index("ix_questions_exam_id_position", "exam_id", "position"),
     )
+
+
+class ExamSourceFile(Base):
+    __tablename__ = "exam_source_files"
+
+    id: Mapped[UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    exam_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(as_uuid=True), ForeignKey("exams.id", ondelete="CASCADE"), nullable=False
+    )
+    original_filename: Mapped[str] = mapped_column(Text, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    page_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_exam_source_files_exam_id", "exam_id"),)
 
 
 class QuestionOption(Base):

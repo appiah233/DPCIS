@@ -23,8 +23,10 @@ import {
 } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { PdfCropEditor } from "@/features/admin/components/PdfCropEditor";
 import { Textarea } from "@/components/ui/textarea";
-import { parseQuestions } from "@/features/admin/adminApi";
+import { importQuestionPdf, parseQuestions, updateQuestionCrops } from "@/features/admin/adminApi";
+import { mergeRegions, renumberAnswers, splitRegions } from "@/features/admin/pdfStructure";
 import { extractImportText } from "@/features/admin/extractImportText";
 import {
   extractAdminApiError,
@@ -49,12 +51,14 @@ D. 409 Conflict
 ANSWER: B`;
 
 export interface BulkParserPanelProps {
+  examId: string;
   disabled?: boolean;
   existingQuestionCount: number;
   onApplyQuestions: (questions: EditableQuestion[], mode: "append" | "replace") => void;
 }
 
 export function BulkParserPanel({
+  examId,
   disabled = false,
   existingQuestionCount,
   onApplyQuestions,
@@ -65,6 +69,7 @@ export function BulkParserPanel({
   const helpId = `${baseId}-format-help`;
 
   const [rawText, setRawText] = useState("");
+  const [questionFile, setQuestionFile] = useState<File | null>(null);
   const [answerKeyText, setAnswerKeyText] = useState("");
   const [activeInput, setActiveInput] = useState<"questions" | "answers">("questions");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -72,8 +77,19 @@ export function BulkParserPanel({
   const [isParsing, setIsParsing] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [parseResult, setParseResult] = useState<ParseQuestionsResponse | null>(null);
+  const [acknowledgedKeyMismatch, setAcknowledgedKeyMismatch] = useState(false);
   const [appliedBanner, setAppliedBanner] = useState<string | null>(null);
   const [confirmReplaceMode, setConfirmReplaceMode] = useState<"valid" | "all" | null>(null);
+  const [pendingStructure, setPendingStructure] = useState<{ kind: "merge" | "split"; position: number } | null>(null);
+  const [splitY, setSplitY] = useState<Record<number, number>>({});
+  const [undoStructure, setUndoStructure] = useState<{
+    preview: ParseQuestionsResponse;
+    answerKey: string;
+    sourceId: string;
+    sourceNumber: number;
+    regions: Array<{ page: number; bbox: number[] }>;
+  } | null>(null);
+  const [structureBusy, setStructureBusy] = useState(false);
 
   const orderedBlocks = useMemo<ParsedQuestion[]>(() => {
     if (!parseResult) {
@@ -83,15 +99,119 @@ export function BulkParserPanel({
       (a, b) => a.position - b.position,
     );
   }, [parseResult]);
+  const keyMismatch = parseResult?.errors.some((error) =>
+    error.message.startsWith("Answer key has "),
+  ) ?? false;
+  const importBlocked = keyMismatch && !acknowledgedKeyMismatch;
+
+  const rebuildPreview = (questions: ParsedQuestion[], original: ParseQuestionsResponse): ParseQuestionsResponse => {
+    const { questions: renumbered, normalizedKey } = renumberAnswers(questions);
+    return {
+      ...original,
+      valid_questions: renumbered.filter((question) => question.valid),
+      invalid_questions: renumbered.filter((question) => !question.valid),
+      total_blocks: renumbered.length,
+      valid_count: renumbered.filter((question) => question.valid).length,
+      errors: renumbered.flatMap((question) => question.errors.map((message) => ({
+        block_index: question.position, message,
+      }))),
+      error_count: renumbered.reduce((count, question) => count + question.errors.length, 0),
+      normalized_answer_key: normalizedKey,
+    };
+  };
+
+  const handleStructureConfirm = async () => {
+    if (!parseResult || !pendingStructure) return;
+    const items = orderedBlocks.map((question) => ({ ...question }));
+    const index = items.findIndex((question) => question.position === pendingStructure.position);
+    const current = items[index];
+    if (!current?.source_file_id || !current.source_number || !current.image_regions?.length) return;
+    setStructureBusy(true);
+    try {
+      const before = structuredClone(parseResult);
+      const originalRegions = current.image_regions;
+      if (pendingStructure.kind === "merge") {
+        const next = items[index + 1];
+        if (!next || next.source_file_id !== current.source_file_id || !next.image_regions?.length) {
+          throw new Error("Only adjacent questions from the same PDF can be merged.");
+        }
+        const mergedRegions = mergeRegions(originalRegions, next.image_regions);
+        const rendered = await updateQuestionCrops(examId, current.source_file_id, current.source_number, mergedRegions);
+        items[index] = { ...current, image_regions: rendered.regions, image_urls: rendered.image_urls,
+          question_text: `${current.question_text} ${next.question_text}`, answer_label: null,
+          points: Number(current.points) + Number(next.points), valid: false,
+          warnings: [...(current.warnings ?? []), "Merged question: review its answer and marks."],
+          errors: ["Select the correct answer for this merged question before saving."],
+        };
+        items.splice(index + 1, 1);
+      } else {
+        const y = splitY[current.position];
+        const [firstRegions, secondRegions] = splitRegions(originalRegions, y);
+        const newNumber = Math.max(...items.map((question) => question.source_number ?? 0)) + 1;
+        const first = await updateQuestionCrops(examId, current.source_file_id, current.source_number, firstRegions);
+        let second;
+        try {
+          second = await updateQuestionCrops(examId, current.source_file_id, newNumber, secondRegions);
+        } catch (error) {
+          await updateQuestionCrops(examId, current.source_file_id, current.source_number, originalRegions);
+          throw error;
+        }
+        items[index] = { ...current, image_regions: first.regions, image_urls: first.image_urls,
+          answer_label: null, valid: false,
+          warnings: [...(current.warnings ?? []), "Split question: review its answer and text."],
+          errors: ["Select the correct answer before saving."],
+        };
+        items.splice(index + 1, 0, { ...current, source_number: newNumber,
+          image_regions: second.regions, image_urls: second.image_urls,
+          answer_label: null, valid: false,
+          warnings: ["New split question: review its answer, text, and marks."],
+          errors: ["Select the correct answer before saving."],
+        });
+      }
+      const updated = rebuildPreview(items, parseResult);
+      setParseResult(updated);
+      setAnswerKeyText(updated.normalized_answer_key?.replaceAll(", ", "\n") ?? "");
+      setUndoStructure({ preview: before, answerKey: answerKeyText,
+        sourceId: current.source_file_id, sourceNumber: current.source_number,
+        regions: originalRegions });
+      setPendingStructure(null);
+      setRequestError(null);
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : "Could not change question boundaries.");
+      setPendingStructure(null);
+    } finally {
+      setStructureBusy(false);
+    }
+  };
+
+  const handleUndoStructure = async () => {
+    if (!undoStructure) return;
+    setStructureBusy(true);
+    try {
+      await updateQuestionCrops(examId, undoStructure.sourceId, undoStructure.sourceNumber, undoStructure.regions);
+      setParseResult(undoStructure.preview);
+      setAnswerKeyText(undoStructure.answerKey);
+      setUndoStructure(null);
+      setRequestError(null);
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : "Could not undo boundary change.");
+    } finally { setStructureBusy(false); }
+  };
 
   const loadImportFile = async (file: File | undefined, kind: "questions" | "answers") => {
     if (!file || disabled || isParsing || isReadingFile) return;
     setIsReadingFile(true);
     try {
-      const contents = await extractImportText(file);
-      if (kind === "questions") setRawText(contents);
-      else setAnswerKeyText(contents);
+      if (kind === "questions") {
+        setQuestionFile(file);
+        try { setRawText(await extractImportText(file)); }
+        catch { setRawText(""); }
+      } else {
+        setAnswerKeyText(await extractImportText(file));
+      }
       setParseResult(null);
+      setUndoStructure(null);
+      setAcknowledgedKeyMismatch(false);
       setAppliedBanner(null);
       setRequestError(null);
     } catch (error) {
@@ -111,8 +231,21 @@ export function BulkParserPanel({
     setAppliedBanner(null);
 
     try {
-      const response = await parseQuestions(rawText, answerKeyText);
+      let response: ParseQuestionsResponse;
+      if (questionFile) {
+        try {
+          response = await importQuestionPdf(examId, questionFile, answerKeyText);
+        } catch (uploadError) {
+          if (!rawText.trim()) throw uploadError;
+          response = await parseQuestions(rawText, answerKeyText);
+          setRequestError("PDF upload failed. Showing a text-only fallback; diagrams will not be preserved.");
+        }
+      } else {
+        response = await parseQuestions(rawText, answerKeyText);
+      }
       setParseResult(response);
+      setUndoStructure(null);
+      setAcknowledgedKeyMismatch(false);
     } catch (error) {
       setRequestError(
         extractAdminApiError(
@@ -138,7 +271,7 @@ export function BulkParserPanel({
   };
 
   const handleReplaceValidClick = () => {
-    if (!parseResult || parseResult.valid_questions.length === 0) {
+    if (!parseResult || parseResult.valid_questions.length === 0 || importBlocked) {
       return;
     }
     if (existingQuestionCount > 0) {
@@ -149,7 +282,7 @@ export function BulkParserPanel({
   };
 
   const handleImportAllWithFixes = () => {
-    if (!parseResult || orderedBlocks.length === 0) {
+    if (!parseResult || orderedBlocks.length === 0 || importBlocked) {
       return;
     }
     if (existingQuestionCount > 0) {
@@ -164,7 +297,7 @@ export function BulkParserPanel({
   };
 
   const handleConfirmReplace = () => {
-    if (!parseResult || !confirmReplaceMode) {
+    if (!parseResult || !confirmReplaceMode || importBlocked) {
       return;
     }
     if (confirmReplaceMode === "valid") {
@@ -251,6 +384,7 @@ export function BulkParserPanel({
                   disabled={disabled || isParsing || isReadingFile}
                   onClick={() => {
                     setRawText("");
+                    setQuestionFile(null);
                     setParseResult(null);
                     setRequestError(null);
                     setAppliedBanner(null);
@@ -272,6 +406,7 @@ export function BulkParserPanel({
             placeholder={SAMPLE_FORMAT_TEXT}
             onChange={(event) => {
               setRawText(event.target.value);
+              setQuestionFile(null);
               setParseResult(null);
               setRequestError(null);
               setAppliedBanner(null);
@@ -321,6 +456,11 @@ export function BulkParserPanel({
               setAppliedBanner(null);
               setRequestError(null);
             }} />
+            {parseResult?.normalized_answer_key ? (
+              <p className="text-sm text-muted-foreground" role="status">
+                Normalized key: {parseResult.normalized_answer_key}. Edit the box above and preview again to change it.
+              </p>
+            ) : null}
           </div>
           <div className={cn("rounded-lg border-2 border-dashed border-border p-4 text-center", isDraggingFile && "border-primary bg-accent")} onDragOver={(event) => { event.preventDefault(); if (!disabled) setIsDraggingFile(true); }} onDragLeave={() => setIsDraggingFile(false)} onDrop={(event) => {
             event.preventDefault();
@@ -377,6 +517,8 @@ export function BulkParserPanel({
           <div className="space-y-4 border-t border-border pt-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-foreground">Question Preview</h3>
+              {undoStructure ? <Button type="button" variant="outline" disabled={structureBusy}
+                onClick={() => void handleUndoStructure()}>Undo last merge or split</Button> : null}
               <div className="flex flex-wrap gap-2" role="status">
                 <Badge variant="secondary">Found: {parseResult.total_blocks}</Badge>
                 <Badge variant={parseResult.valid_count > 0 ? "success" : "secondary"}>
@@ -387,6 +529,12 @@ export function BulkParserPanel({
                 </Badge>
               </div>
             </div>
+            {parseResult.ocr_used ? (
+              <Alert role="status">
+                <AlertTitle>OCR used</AlertTitle>
+                <AlertDescription>These questions have lower confidence. Review every crop and answer before saving.</AlertDescription>
+              </Alert>
+            ) : null}
 
             {parseResult.errors.length > 0 ? (
               <Alert variant="destructive" role="alert">
@@ -439,12 +587,19 @@ export function BulkParserPanel({
 
             {orderedBlocks.length > 0 ? (
               <div className="space-y-3">
+                {keyMismatch ? (
+                  <label className="flex min-h-11 items-center gap-2 text-sm">
+                    <input type="checkbox" checked={acknowledgedKeyMismatch}
+                      onChange={(event) => setAcknowledgedKeyMismatch(event.target.checked)} />
+                    I have reviewed the answer-key count mismatch and will correct any missing answers before saving.
+                  </label>
+                ) : null}
                 <div className="flex flex-wrap gap-2.5">
                   {parseResult.valid_questions.length > 0 ? (
                     <>
                       <Button
                         type="button"
-                        disabled={disabled}
+                        disabled={disabled || importBlocked}
                         onClick={() =>
                           applyParsedBlocks(parseResult.valid_questions, "append", false)
                         }
@@ -456,7 +611,7 @@ export function BulkParserPanel({
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={disabled}
+                        disabled={disabled || importBlocked}
                         onClick={handleReplaceValidClick}
                       >
                         <Replace className="size-4" aria-hidden="true" />
@@ -471,7 +626,7 @@ export function BulkParserPanel({
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={disabled}
+                      disabled={disabled || importBlocked}
                       onClick={() =>
                         applyParsedBlocks(
                           parseResult.invalid_questions,
@@ -492,7 +647,7 @@ export function BulkParserPanel({
                     <Button
                       type="button"
                       variant="ghost"
-                      disabled={disabled}
+                      disabled={disabled || importBlocked}
                       onClick={handleImportAllWithFixes}
                     >
                       <span>Replace list with all ({orderedBlocks.length}) to edit</span>
@@ -541,6 +696,47 @@ export function BulkParserPanel({
                             <em className="text-destructive">(Missing question text)</em>
                           )}
                         </p>
+                        {block.source_file_id && block.image_regions ? (
+                          <PdfCropEditor examId={examId} question={block}
+                            pageDimensions={parseResult.page_dimensions ?? []}
+                            onUpdated={(regions, imageUrls) => setParseResult((current) => {
+                              if (!current) return current;
+                              const update = (question: ParsedQuestion) => question.position === block.position
+                                ? { ...question, image_regions: regions, image_urls: imageUrls }
+                                : question;
+                              return {
+                                ...current,
+                                valid_questions: current.valid_questions.map(update),
+                                invalid_questions: current.invalid_questions.map(update),
+                              };
+                            })} />
+                        ) : null}
+                        {block.source_file_id && block.image_regions?.length ? (
+                          <div className="mt-3 flex flex-wrap items-end gap-2">
+                            {block.position < orderedBlocks.length ? (
+                              <Button type="button" variant="outline" disabled={structureBusy}
+                                onClick={() => setPendingStructure({ kind: "merge", position: block.position })}>
+                                Merge with next question
+                              </Button>
+                            ) : null}
+                            <label className="flex flex-col gap-1 text-xs">
+                              Split at page y (pt)
+                              <input type="number" className="w-28 rounded border p-2" min={0}
+                                value={splitY[block.position] ?? ""}
+                                onChange={(event) => setSplitY((current) => ({
+                                  ...current, [block.position]: Number(event.target.value),
+                                }))} />
+                            </label>
+                            <Button type="button" variant="outline" disabled={structureBusy}
+                              onClick={() => setPendingStructure({ kind: "split", position: block.position })}>
+                              Split question
+                            </Button>
+                          </div>
+                        ) : null}
+                        <p className="mt-2 text-xs">Marks: {block.points}</p>
+                        {block.warnings?.map((warning) => (
+                          <p key={warning} className="mt-1 text-xs text-amber-700">{warning}</p>
+                        ))}
 
                         {block.options.length > 0 ? (
                           <ul className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
@@ -598,6 +794,12 @@ export function BulkParserPanel({
         confirmVariant="destructive"
         onConfirm={handleConfirmReplace}
       />
+      <ConfirmDialog open={pendingStructure !== null}
+        onOpenChange={(open) => { if (!open && !structureBusy) setPendingStructure(null); }}
+        title={pendingStructure?.kind === "merge" ? "Merge adjacent questions?" : "Split this question?"}
+        description="This changes PDF crop boundaries and shifts preview question numbers and answer keys. Review answers and marks before saving. You can undo this change."
+        confirmLabel={pendingStructure?.kind === "merge" ? "Merge questions" : "Split question"}
+        isPending={structureBusy} onConfirm={() => void handleStructureConfirm()} />
     </Card>
   );
 }

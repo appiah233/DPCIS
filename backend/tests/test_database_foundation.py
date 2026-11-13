@@ -250,6 +250,7 @@ def test_base_metadata_resolves_complete_application_schema_without_double_prefi
         "exams",
         "questions",
         "question_options",
+        "exam_source_files",
         "exam_attempts",
         "attempt_questions",
         "student_answers",
@@ -619,10 +620,11 @@ def test_alembic_infrastructure_has_single_linear_head_0004() -> None:
     assert not alembic_cfg.get_main_option("sqlalchemy.url")
 
     script_dir = ScriptDirectory.from_config(alembic_cfg)
-    assert script_dir.get_heads() == ["0004_exam_closed_at_and_indexes"]
+    assert script_dir.get_heads() == ["0005_exam_pdf_sources"]
 
     history_revs = [rev.revision for rev in script_dir.walk_revisions()]
     assert history_revs == [
+        "0005_exam_pdf_sources",
         "0004_exam_closed_at_and_indexes",
         "0003_attempt_option_order",
         "0002_examination_schema",
@@ -636,6 +638,7 @@ def test_alembic_infrastructure_has_single_linear_head_0004() -> None:
         "0002_examination_schema.py",
         "0003_attempt_option_order.py",
         "0004_exam_closed_at_and_indexes.py",
+        "0005_exam_pdf_sources.py",
     ]
 
 
@@ -665,6 +668,7 @@ def test_alembic_full_chain_offline_postgres_upgrade_and_downgrade_sql(
             "exam_attempts",
             "attempt_questions",
             "student_answers",
+            "exam_source_files",
         ):
             assert f"CREATE TABLE {table_name} (" in upgrade_sql
 

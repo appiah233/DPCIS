@@ -537,7 +537,7 @@ def start_attempt(
 
     for display_order, question in enumerate(selected_questions):
         ordered_opts = sorted(question.options, key=lambda o: (o.position, o.id))
-        if exam.randomize_options:
+        if exam.randomize_options and not question.source_file_id:
             _SYSTEM_RANDOM.shuffle(ordered_opts)
         aq = attempt_models.AttemptQuestion(
             attempt_id=attempt.id,
@@ -652,7 +652,11 @@ def get_attempt_for_delivery(
     question_deliveries: list[AttemptQuestionDelivery] = []
     for aq in aq_rows:
         question = aq.question
-        ordered_opts = _order_options_by_snapshot(question.options, aq.option_order)
+        ordered_opts = (
+            sorted(question.options, key=lambda opt: opt.position)
+            if question.source_file_id else
+            _order_options_by_snapshot(question.options, aq.option_order)
+        )
         option_deliveries = [
             AttemptOptionDelivery(
                 id=opt.id,
@@ -666,6 +670,11 @@ def get_attempt_for_delivery(
                 id=question.id,
                 display_order=aq.display_order,
                 question_text=question.question_text,
+                image_urls=(
+                    [f"/api/attempts/{attempt.id}/questions/{question.id}/images/{i}"
+                     for i, _ in enumerate(json.loads(question.image_regions or "[]"))]
+                    if question.source_file_id else []
+                ),
                 points=_quantize(question.points),
                 options=option_deliveries,
             )

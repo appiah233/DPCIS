@@ -44,3 +44,5 @@ Thumbs.db
 *.pid
 imageDetail.json
 imagedefinitions.json
+backend/var/exam-pdfs/
+backend/tests/fixtures/.preview/

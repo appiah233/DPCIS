@@ -38,6 +38,12 @@ Import-size update (Codex, 2026-11-13): The admin `.txt`/`.md` question and answ
 
 PDF-only import follow-up (Codex, 2026-11-13): The user narrowed question and answer-key file upload to PDF only while retaining paste-in text. Both file pickers use PDF filters, drag/drop checks the `.pdf` extension, and `extractImportText.ts` uses PDF.js to extract selectable text (up to 100 MiB) before the existing backend preview/answer-key validation. Scanned/image-only PDFs require OCR before import; page text ordering must be checked in preview. This is browser-side extraction, not a new backend file endpoint. Files: `frontend/src/features/admin/{components/BulkParserPanel.tsx,extractImportText.ts}`, `frontend/{package.json,package-lock.json}`. The previously explored Word dependency was removed.
 
+PDF import upgrade follow-up (Codex, 2026-11-13): Parser accepts sequential bare numbered headers and normalizes numbered, compact, and mark-scheme answer keys with noise lines and optional marks; preview exposes the normalized key for admin review. Files: `backend/app/exams/{parser.py,schemas.py}`, `backend/tests/test_parser.py`, `frontend/src/{types/adminExam.ts,features/admin/components/BulkParserPanel.tsx}`. This is partial: coordinate-aware PDF detection, original PDF/image storage, OCR, crop editing, and student image delivery are not implemented. Do not treat the sample PDF acceptance criteria as met.
+
+PDF image import workstream (Codex, 2026-11-13): Added PyMuPDF coordinate detection, repeated-band exclusion, 200 DPI private crops and UUID-based local source storage; additive migration `0005_exam_pdf_sources` extends questions with source/crop metadata. Crops use full page width and tight vertical bounds: a manual Q21 render showed that a narrow horizontal clip dropped a whole text run. Admin multipart upload/preview, authenticated admin images, saved source references, and active-attempt student image delivery are wired through API and React. Sample PDF fixtures and API/unit tests cover 24 sequential regions, diagram crop content, mark-scheme key, grading, and role-gated images. Storage defaults to `backend/var/exam-pdfs` and should be placed on durable shared storage via `EXAM_PDF_STORAGE_DIR` before multi-instance deployment. Local Alembic upgrade remains blocked because no `DATABASE_URL`/`DIRECT_DATABASE_URL` is configured. Phase 2 crop editing/OCR/regeneration is not started; browser responsive checks and live Neon integration remain unverified.
+
+Phase 2 PDF follow-up (Codex, 2026-11-13): `regenerate_crops` re-renders from the original source with validated page/bbox, DPI and padding; same-settings PNG bytes matched in a focused test. Admin crop PUT enforces draft exam/source ownership and bounds, updates saved question metadata, and returns private cache-busted URLs. Preview offers top/bottom drag handles, add/remove next page region, DPI/padding regeneration, confirmed merge/split with renumbered answer preview, and one-step undo. Coordinate detection now handles a two-column fixture and a cross-page question fixture. Optional OCR fallback is invoked for fewer than two headers, reports unavailable software clearly, and marks OCR previews at lower confidence. The image-only fixture, stubbed OCR routing, two-column and spanning fixtures passed local automated tests; real Tesseract output and rendered browser interaction were not tested because Tesseract and a configured signed-in app session are unavailable. No Phase 2 migration was needed; student payload shape and answer-key isolation were unchanged.
+
 | WORKSTREAM | OWNER | STATUS | FILES/DIRECTORIES | DEPENDENCIES | LAST UPDATE | BLOCKER | HANDOFF NOTES |
 |---|---|---|---|---|---|---|---|
 | Neon Auth restoration | Codex | IMPLEMENTED_LOCAL | `backend/app/auth/*`, `backend/app/config.py`, `frontend/src/lib/*`, `frontend/src/features/auth/*`, env templates | Neon Managed Auth for credentials; Neon PostgreSQL `application_users.role` for authorization | 2026-11-13 | Deployed backend/frontend configuration remains unverified | Reverted Cognito-specific code, dependency, callback, tests and local auth settings. New accounts default to STUDENT; ADMIN requires an authorized database role update. No client or token role claim grants access. |
@@ -141,3 +147,35 @@ Root health & identity routes reside at `/`, and all domain routes are mounted u
    - Commit a Playwright Chromium E2E + responsive/a11y suite into the repository so CI executes it automatically.
 6. **Phase 3 Feature Backlog:**
    - Deliver verified Google OAuth + optional phone-number auth (per Neon Auth config), exam-to-student roster/cohort assignment, timer & reconnect UX polish, and ECS/CloudWatch structured observability.
+## Reference QP coordinate audit (2026-11-13)
+
+Measured directly from `backend/tests/fixtures/atomic_structure_qp.pdf` with PyMuPDF `page.get_text("words")`. Values are x0 in PDF points, rounded to 0.1. Each row gives the question-number x0, then every literal A/B/C/D option-letter glyph within that question crop. Q3 has a second `A` glyph in the content, which is recorded separately. The number range is 48.6–68.7 pt (20.1 pt spread); Q6 at 68.7 pt approaches the usual option-letter column at roughly 71–81 pt. The user's approximate 30 pt estimate was not the measured spread in this file.
+
+| Q | Page | Number x0 | Option-letter x0 (A, B, C, D) |
+|---:|---:|---:|---|
+| 1 | 1 | 50.7 | 73.3, 73.3, 73.3, 73.3 |
+| 2 | 1 | 48.6 | 71.2, 71.2, 71.2, 71.2 |
+| 3 | 1 | 49.6 | 70.9 (also A at 92.1), 70.9, 70.9, 70.9 |
+| 4 | 2 | 48.6 | 138.7, 156.3, 156.5, 410.7 |
+| 5 | 2 | 56.2 | 73.0, 172.2, 271.5, 370.7 |
+| 6 | 2 | 68.7 | 120.0, 242.2, 364.6, 487.0 |
+| 7 | 3 | 48.6 | 80.1, 80.1, 80.1, 80.1 |
+| 8 | 3 | 53.3 | 74.5, 173.8, 273.1, 372.3 |
+| 9 | 3 | 53.3 | 74.5, 173.8, 273.1, 372.3 |
+| 10 | 3 | 54.3 | 77.0, 77.0, 77.0, 77.0 |
+| 11 | 4 | 50.1 | 72.8, 72.8, 72.8, 72.8 |
+| 12 | 4 | 52.0 | 73.2, 73.2, 73.2, 73.2 |
+| 13 | 4 | 53.3 | 74.6, 74.6, 74.6, 74.6 |
+| 14 | 5 | 50.3 | 71.6, 170.8, 270.1, 369.3 |
+| 15 | 5 | 49.5 | 124.0, 232.1, 340.4, 448.7 |
+| 16 | 6 | 49.6 | 81.1, 81.1, 81.1, 81.1 |
+| 17 | 6 | 50.7 | 71.9, 71.9, 71.9, 71.9 |
+| 18 | 6 | 49.6 | 70.9, 70.9, 70.9, 70.9 |
+| 19 | 7 | 49.6 | 72.3, 72.3, 72.3, 72.3 |
+| 20 | 7 | 49.6 | 72.3, 172.9, 273.5, 374.2 (PDF stream order was D, C, B, A) |
+| 21 | 7 | 48.6 | 138.7, 156.3, 156.5, 410.7 |
+| 22 | 8 | 51.4 | 72.7, 171.9, 271.2, 370.4 |
+| 23 | 8 | 51.7 | 74.4, 74.4, 74.4, 74.4 |
+| 24 | 8 | 51.3 | 72.6, 171.8, 271.1, 370.3 |
+
+The reference manifest was saved at `backend/tests/fixtures/pdfs/cie_igcse_chem_2_2_atomic_structure_qp.expected.json`. All human `first_words` entries matched after line-aware ordering and whitespace normalization; none was changed. The parser now sorts words before detection, uses geometry to ignore vector-table interiors for header/option detection, classifies image/table/inline-row option layouts, and keeps section headings out of question crops. Focused tests cover a +25 pt shifted first page, shuffled word stream, all 24 manifest entries, single-page header overlay, and a second synthetic page-spanning question. No student payload schema was changed.

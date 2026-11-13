@@ -218,6 +218,7 @@ export function StudentAttemptPage() {
             questionNumber={currentIndex + 1}
             totalQuestions={totalQuestions}
             questionText={currentQuestion.question_text}
+            imageUrls={currentQuestion.image_urls}
             points={currentQuestion.points}
             options={currentQuestion.options.map((opt) => ({
               optionId: opt.id,

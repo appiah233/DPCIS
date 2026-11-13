@@ -1,0 +1,36 @@
+{
+  "page_count": 8,
+  "sections": { "Paper 1": [1, 18], "Paper 2": [19, 24] },
+  "questions": {
+    "1": {"page": 1, "first_words": "Four ions are listed.", "options_kind": "text"},
+    "2": {"page": 1, "first_words": "Rubidium and strontium are both", "options_kind": "text"},
+    "3": {"page": 1, "first_words": "Which statement about elements in", "options_kind": "text"},
+    "4": {"page": 2, "first_words": "Part of the Periodic Table", "options_kind": "image"},
+    "5": {"page": 2, "first_words": "Which statements about the trends", "options_kind": "inline_row", "has_statement_list": true},
+    "6": {"page": 2, "first_words": "Which diagram shows the electronic", "options_kind": "image"},
+    "7": {"page": 3, "first_words": "What are the relative charge", "options_kind": "table"},
+    "8": {"page": 3, "first_words": "The Group I element potassium", "options_kind": "inline_row"},
+    "9": {"page": 3, "first_words": "The electronic configurations of four", "options_kind": "inline_row", "has_data_table": true},
+    "10": {"page": 3, "first_words": "Which pair of atoms contains", "options_kind": "text"},
+    "11": {"page": 4, "first_words": "Which statement about the noble", "options_kind": "text"},
+    "12": {"page": 4, "first_words": "Which statement about the Periodic", "options_kind": "text"},
+    "13": {"page": 4, "first_words": "Three properties of element X", "options_kind": "text", "has_bullets": true},
+    "14": {"page": 5, "first_words": "Information about the structures of", "options_kind": "inline_row", "has_statement_list": true},
+    "15": {"page": 5, "first_words": "Which diagram represents the arrangement", "options_kind": "image"},
+    "16": {"page": 6, "first_words": "The structure of an atom", "options_kind": "table"},
+    "17": {"page": 6, "first_words": "Which statement about the Periodic", "options_kind": "text"},
+    "18": {"page": 6, "first_words": "Gas G has 10 electrons.", "options_kind": "text"},
+    "19": {"page": 7, "first_words": "Which statement about an atom", "options_kind": "text"},
+    "20": {"page": 7, "first_words": "Elements P and Q have", "options_kind": "inline_row", "has_statement_list": true},
+    "21": {"page": 7, "first_words": "Part of the Periodic Table", "options_kind": "image"},
+    "22": {"page": 8, "first_words": "Nitrogen forms a nitride ion", "options_kind": "inline_row"},
+    "23": {"page": 8, "first_words": "Which statement about the noble", "options_kind": "text"},
+    "24": {"page": 8, "first_words": "The electronic structure of element", "options_kind": "inline_row", "has_statement_list": true}
+  },
+  "identical_pairs": [[4, 21], [11, 23]],
+  "expected_key": {
+    "1":"B","2":"C","3":"A","4":"C","5":"C","6":"A","7":"D","8":"B","9":"B","10":"C",
+    "11":"C","12":"C","13":"C","14":"A","15":"A","16":"D","17":"B","18":"A",
+    "19":"A","20":"C","21":"C","22":"B","23":"C","24":"C"
+  }
+}

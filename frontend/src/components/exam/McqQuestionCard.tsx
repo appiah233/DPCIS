@@ -1,10 +1,11 @@
 import { ArrowLeft, ArrowRight, Check, Send } from "lucide-react";
-import { useId, type RefObject } from "react";
+import { useCallback, useEffect, useId, useState, type RefObject } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { AuthenticatedPdfImage } from "@/components/exam/AuthenticatedPdfImage";
 
 export interface McqOptionItem {
   optionId: string;
@@ -16,6 +17,7 @@ export interface McqQuestionCardProps {
   questionNumber: number;
   totalQuestions: number;
   questionText: string;
+  imageUrls?: string[];
   points?: string | number;
   options: readonly McqOptionItem[];
   selectedOptionId: string | null;
@@ -36,6 +38,7 @@ export function McqQuestionCard({
   questionNumber,
   totalQuestions,
   questionText,
+  imageUrls = [],
   points,
   options,
   selectedOptionId,
@@ -52,6 +55,11 @@ export function McqQuestionCard({
   className,
 }: McqQuestionCardProps) {
   const radioGroupName = useId();
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageKey = imageUrls.join("|");
+  useEffect(() => setImageFailed(false), [imageKey]);
+  const handleImageError = useCallback(() => setImageFailed(true), []);
+  const hasImage = imageUrls.length > 0 && !imageFailed;
   const pointsNumeric = typeof points === "string" ? Number.parseFloat(points) : points;
   const formattedPoints =
     points !== undefined && Number.isFinite(pointsNumeric)
@@ -74,8 +82,12 @@ export function McqQuestionCard({
       <CardContent className="pt-5 sm:pt-6">
         <fieldset className="m-0 min-w-0 border-0 p-0">
           <legend className="mb-5 block w-full break-words p-0 text-lg font-semibold leading-relaxed text-foreground sm:text-xl">
-            {questionText}
+            {hasImage ? `Question ${questionNumber}: choose one answer` : questionText}
           </legend>
+          {imageUrls.map((path) => (
+            <AuthenticatedPdfImage key={path} path={path} alt={questionText}
+              onError={handleImageError} className="mb-4 h-auto w-full max-w-full rounded border" />
+          ))}
 
           <div className="grid gap-3">
             {options.map((option) => {
@@ -119,7 +131,7 @@ export function McqQuestionCard({
                   </span>
 
                   <span className="min-w-0 flex-1 break-words pt-1 text-base leading-relaxed text-foreground">
-                    {option.optionText}
+                    {hasImage ? `Select ${option.label}` : option.optionText}
                   </span>
 
                   {isSelected ? (

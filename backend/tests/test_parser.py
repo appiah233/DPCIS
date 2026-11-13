@@ -578,3 +578,29 @@ def test_schema_types_and_service_wrapper_compatibility() -> None:
     _assert_response_invariants(resp)
     label: OptionLabel | None = resp.valid_questions[0].answer_label
     assert label == "A"
+
+
+def test_bare_numbered_headers_preserve_sequential_blocks() -> None:
+    raw = "1 First?\nA. Yes\nB. No\nANSWER: B\n2 Second?\nA. One\nB. Two\nANSWER: A"
+    result = parse_questions(raw)
+    assert result.valid_count == 2
+    assert [q.question_text for q in result.valid_questions] == ["First?", "Second?"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "1. B\n2. C\n3. A",
+        "1B,2C,3A",
+        "BCA",
+        "Question Answer Marks\nCambridge IGCSE Mark Scheme\n1 B 1\n2 C 1\n3 A 1\nPUBLISHED",
+    ],
+)
+def test_answer_key_formats_normalize_to_same_answers(key: str) -> None:
+    questions = "\n".join(
+        f"{number} Question {number}?\nA. First\nB. Second\nC. Third"
+        for number in range(1, 4)
+    )
+    result = parse_questions_with_answer_key(questions, key)
+    assert result.valid_count == 3
+    assert [q.answer_label for q in result.valid_questions] == ["B", "C", "A"]

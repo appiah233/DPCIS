@@ -37,6 +37,7 @@ Invariants
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -168,6 +169,17 @@ def _to_question_admin_out(question: exam_models.Question) -> QuestionAdminOut:
     return QuestionAdminOut(
         id=question.id,
         question_text=question.question_text,
+        source_file_id=question.source_file_id,
+        source_number=question.source_number,
+        image_urls=(
+            [f"/api/admin/exams/{question.exam_id}/source-images/{question.source_file_id}/{question.source_number}/{i}"
+             for i, _ in enumerate(json.loads(question.image_regions or "[]"))]
+            if question.source_file_id else []
+        ),
+        image_regions=json.loads(question.image_regions or "[]"),
+        pdf_options_text=json.loads(question.pdf_options_text or "{}"),
+        pdf_warnings=json.loads(question.pdf_warnings or "[]"),
+        pdf_confidence=question.pdf_confidence,
         position=question.position,
         points=question.points,
         options=[QuestionOptionAdminOut.model_validate(opt) for opt in sorted_options],
@@ -233,9 +245,38 @@ def _build_question_model(
         id=question_id,
         exam_id=exam_id,
         question_text=data.question_text,
+        source_file_id=data.source_file_id,
+        source_number=data.source_number,
+        pdf_options_text=json.dumps(data.pdf_options_text) if data.source_file_id else None,
+        pdf_warnings=json.dumps(data.pdf_warnings) if data.source_file_id else None,
+        pdf_confidence=data.pdf_confidence if data.source_file_id else None,
         position=position,
         points=data.points,
         options=options,
+    )
+
+
+def _validate_source_reference(db: Session, exam_id: UUID, data: QuestionCreate) -> str | None:
+    if data.source_file_id is None:
+        if data.source_number is not None:
+            raise HTTPException(status_code=400, detail="PDF question number needs a source file")
+        return None
+    source = db.get(exam_models.ExamSourceFile, data.source_file_id)
+    if source is None or source.exam_id != exam_id or data.source_number is None:
+        raise HTTPException(status_code=400, detail="Invalid PDF source for question")
+    from app.exams.pdf_storage import load_regions
+
+    try:
+        return json.dumps(load_regions(data.source_file_id, data.source_number))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="PDF question crop is unavailable") from exc
+
+
+def _image_paths_json(source_number: int | None, image_regions: str | None) -> str | None:
+    if source_number is None or image_regions is None:
+        return None
+    return json.dumps(
+        [f"{source_number}-{index}.png" for index, _ in enumerate(json.loads(image_regions))]
     )
 
 
@@ -405,15 +446,19 @@ def save_questions(
 
     positions = _resolve_bulk_positions(questions)
 
+    regions = [_validate_source_reference(db, exam.id, item) for item in questions]
+
     exam.questions.clear()
     db.flush()
 
-    for q_data, pos in zip(questions, positions, strict=True):
+    for q_data, pos, image_regions in zip(questions, positions, regions, strict=True):
         question = _build_question_model(
             exam_id=exam.id,
             data=q_data,
             position=pos,
         )
+        question.image_regions = image_regions
+        question.image_paths = _image_paths_json(q_data.source_number, image_regions)
         exam.questions.append(question)
 
     exam.updated_at = _utc_now()
@@ -434,6 +479,7 @@ def add_question(
     require_admin_user_id(identity)
     exam = _get_exam_or_404(db, exam_id, for_update=True)
     _require_draft(exam, "Questions can only be added to a draft examination")
+    image_regions = _validate_source_reference(db, exam.id, data)
 
     existing_positions = set(
         db.execute(
@@ -458,6 +504,8 @@ def add_question(
         data=data,
         position=position,
     )
+    question.image_regions = image_regions
+    question.image_paths = _image_paths_json(data.source_number, image_regions)
     exam.updated_at = _utc_now()
     db.add(question)
     db.add(exam)
@@ -483,6 +531,7 @@ def update_question(
     require_admin_user_id(identity)
     exam = _get_exam_or_404(db, exam_id, for_update=True)
     _require_draft(exam, "Questions can only be modified on a draft examination")
+    image_regions = _validate_source_reference(db, exam.id, data)
 
     question = db.execute(
         select(exam_models.Question)
@@ -515,6 +564,13 @@ def update_question(
 
     now = _utc_now()
     question.question_text = data.question_text
+    question.source_file_id = data.source_file_id
+    question.source_number = data.source_number
+    question.image_regions = image_regions
+    question.image_paths = _image_paths_json(data.source_number, image_regions)
+    question.pdf_options_text = json.dumps(data.pdf_options_text) if data.source_file_id else None
+    question.pdf_warnings = json.dumps(data.pdf_warnings) if data.source_file_id else None
+    question.pdf_confidence = data.pdf_confidence if data.source_file_id else None
     question.points = data.points
     question.updated_at = now
 
