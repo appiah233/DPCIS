@@ -63,6 +63,7 @@ export function BulkParserPanel({
   const helpId = `${baseId}-format-help`;
 
   const [rawText, setRawText] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [parseResult, setParseResult] = useState<ParseQuestionsResponse | null>(null);
@@ -77,6 +78,24 @@ export function BulkParserPanel({
       (a, b) => a.position - b.position,
     );
   }, [parseResult]);
+
+  const loadQuestionFile = async (file: File | undefined) => {
+    if (!file || disabled || isParsing) return;
+    if (!/\.(txt|md)$/i.test(file.name) || file.size > 2 * 1024 * 1024) {
+      setRequestError("Choose a .txt or .md question file smaller than 2 MB.");
+      return;
+    }
+    try {
+      const contents = await file.text();
+      if (!contents.trim()) throw new Error("The selected file is empty.");
+      setRawText(contents);
+      setParseResult(null);
+      setAppliedBanner(null);
+      setRequestError(null);
+    } catch {
+      setRequestError("The question file could not be read. Please try another text file.");
+    }
+  };
 
   const handleParse = async () => {
     if (disabled || isParsing) {
@@ -165,7 +184,7 @@ export function BulkParserPanel({
               Paste Questions
             </CardTitle>
             <CardDescription>
-              Paste multiple-choice questions below to preview them and catch formatting issues
+              Paste or upload multiple-choice questions below to preview them and catch formatting issues
               before adding them to your exam. Missing answers are flagged for you to choose.
             </CardDescription>
           </div>
@@ -200,6 +219,7 @@ export function BulkParserPanel({
                 disabled={disabled || isParsing}
                 onClick={() => {
                   setRawText(SAMPLE_FORMAT_TEXT);
+                  setParseResult(null);
                   setRequestError(null);
                   setAppliedBanner(null);
                 }}
@@ -236,10 +256,38 @@ export function BulkParserPanel({
             placeholder={SAMPLE_FORMAT_TEXT}
             onChange={(event) => {
               setRawText(event.target.value);
+              setParseResult(null);
               setRequestError(null);
               setAppliedBanner(null);
             }}
           />
+        </div>
+
+        <div
+          className={cn("rounded-lg border-2 border-dashed border-border p-4 text-center", isDraggingFile && "border-primary bg-accent")}
+          onDragOver={(event) => { event.preventDefault(); if (!disabled) setIsDraggingFile(true); }}
+          onDragLeave={() => setIsDraggingFile(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingFile(false);
+            void loadQuestionFile(event.dataTransfer.files[0]);
+          }}
+        >
+          <Label htmlFor={`${baseId}-file`} className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium focus-within:outline-2 focus-within:outline-primary">
+            Choose question file
+            <input
+              id={`${baseId}-file`}
+              type="file"
+              accept=".txt,.md,text/plain,text/markdown"
+              disabled={disabled || isParsing}
+              className="sr-only"
+              onChange={(event) => {
+                void loadQuestionFile(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
+          </Label>
+          <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md file here (up to 2 MB). Preview and save the questions before publishing.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

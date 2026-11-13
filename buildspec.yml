@@ -4,7 +4,6 @@ env:
   variables:
     IMAGE_REPO_NAME: "examination-hub-api"
     PUSH_IMAGE: "false"
-    DEPLOY_VERCEL: "false"
 
 phases:
   install:
@@ -142,17 +141,4 @@ phases:
           printf '{"ImageURI":"%s:%s"}\n' "${FULL_REPO}" "${IMAGE_TAG}" > imageDetail.json
         else
           echo "Docker build succeeded; ECR push skipped because PUSH_IMAGE=${PUSH_IMAGE}."
-        fi
-      - |
-        if [ "${DEPLOY_VERCEL}" = "true" ]; then
-          if [ -z "${VERCEL_TOKEN:-}" ] || [ -z "${VERCEL_ORG_ID:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
-            echo "ERROR: DEPLOY_VERCEL=true requires VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID."
-            exit 1
-          fi
-          echo "Deploying frontend via Vercel CLI (prebuilt/production gated)..."
-          cd frontend
-          npx --yes vercel@latest deploy --prod --yes --token "${VERCEL_TOKEN}"
-          cd ..
-        else
-          echo "Vercel deployment skipped because DEPLOY_VERCEL=${DEPLOY_VERCEL}."
         fi

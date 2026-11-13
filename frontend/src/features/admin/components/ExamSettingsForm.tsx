@@ -432,7 +432,7 @@ export function ExamSettingsForm({
 
             <div className="field-group space-y-1.5">
               <Label htmlFor={maxAttemptsId}>
-                Max attempts per student <span className="text-destructive">*</span>
+                Retake policy: maximum attempts per student <span className="text-destructive">*</span>
               </Label>
               <Input
                 id={maxAttemptsId}

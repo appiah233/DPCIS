@@ -107,7 +107,8 @@ export function StudentAttemptPage() {
   const currentSelection = currentQuestion ? (answers[currentQuestion.id] ?? null) : null;
 
   return (
-    <div className="space-y-5">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
+      <div className="min-w-0 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs sm:px-5">
         <div className="min-w-0 space-y-0.5">
           <h1
@@ -274,6 +275,33 @@ export function StudentAttemptPage() {
           }
         />
       )}
+
+      </div>
+
+      <aside aria-label="Question progress" className="hidden rounded-lg border border-border bg-card p-4 lg:sticky lg:top-4 lg:block">
+        <h2 className="text-base font-semibold text-foreground">Questions</h2>
+        <p className="mt-1 text-sm text-muted-foreground" aria-live="polite">{answeredCount} of {totalQuestions} answered</p>
+        <div className="mt-4 space-y-2">
+          {questions.map((question, index) => {
+            const isAnswered = Boolean(answers[question.id]);
+            const isCurrent = index === currentIndex;
+            return (
+              <button
+                key={question.id}
+                type="button"
+                aria-current={isCurrent ? "step" : undefined}
+                aria-label={`Question ${index + 1}, ${isAnswered ? "answered" : "unanswered"}${isCurrent ? ", current" : ""}`}
+                onClick={() => navigateToQuestion(index)}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-md border px-3 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isCurrent ? "border-primary bg-accent" : "border-border hover:bg-muted"}`}
+              >
+                <span className={`size-3 shrink-0 rounded-full border-2 ${isAnswered ? "border-primary bg-primary" : "border-muted-foreground"}`} aria-hidden="true" />
+                <span>Question {index + 1}</span>
+                <span className="sr-only">{isAnswered ? "Answered" : "Unanswered"}</span>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
 
       <QuestionNavigatorDialog
         open={isNavigatorOpen}

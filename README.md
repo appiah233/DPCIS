@@ -10,7 +10,7 @@
 Examination Hub is a responsive web examination platform (`320px`–`1440px+`) designed around two server-enforced roles (`ADMIN` and `STUDENT` in `application_users`):
 
 - **Students:** Sign in via Neon Managed Better Auth, browse published examinations (`/student`), inspect exam instructions and attempt limits (`/student/exams/:examId`), start or resume timed MCQ attempts (`/student/attempts/:attemptId`) with server-authoritative UTC `started_at`/`expires_at` countdowns and autosave, submit manually or automatically upon timer expiry, and view backend-graded scores (`/student/results/:attemptId`) gated by `show_result` and post-finalization `show_correct_answers`.
-- **Administrators:** Sign in via Neon Managed Better Auth, create and manage draft examinations (`/admin`, `/admin/exams/new`, `/admin/exams/:examId`), paste raw MCQ text into the deterministic Python parser for live preview and editing, configure duration, pass mark, question limits, randomization, and result visibility, publish or close exams, and review participant results and attempt breakdowns (`/admin/exams/:examId/results`).
+- **Administrators:** Sign in via Neon Managed Better Auth, create and manage draft examinations (`/admin`, `/admin/exams/new`, `/admin/exams/:examId`), paste MCQ text or load a `.txt`/`.md` question file for preview and editing, configure duration, pass mark, question limits, maximum attempts, randomization, and result visibility, publish exams for all students or close them, and review participant results and attempt breakdowns (`/admin/exams/:examId/results`).
 
 ---
 
@@ -31,7 +31,7 @@ The repository separates API logic, responsive browser UI, identity, database pe
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui-compatible components, React Router, `@neondatabase/auth`
 - **Authentication:** Neon Managed Better Auth (Google OAuth / email-password)
 - **Database:** Neon PostgreSQL
-- **Deployment / CI:** Docker (`python:3.12-slim`), GitHub Actions, AWS CodePipeline, AWS CodeBuild (`buildspec.yml`), Amazon ECR (`examination-hub-api`), AWS App Runner, Vercel (`frontend/vercel.json`), Amazon CloudWatch
+- **Deployment / CI:** Docker (`python:3.12-slim`), GitHub Actions, AWS CodePipeline, AWS CodeBuild (`buildspec.yml`), Amazon ECR (`examination-hub-api`), Amazon ECS Express Mode on Fargate with managed HTTPS load balancing, Vercel (`frontend/vercel.json`), Amazon CloudWatch
 
 ---
 
@@ -67,7 +67,7 @@ The repository separates API logic, responsive browser UI, identity, database pe
 │   └── requirements.txt
 ├── docs/
 │   ├── agent-coordination.md     # Multi-agent & external peer (Cline) coordination ledger and API contract
-│   └── deployment-aws-vercel.md  # Zero-secret AWS CodePipeline/CodeBuild/App Runner + Vercel SPA deployment runbook
+│   └── deployment-aws-vercel.md  # Zero-secret AWS CodePipeline/CodeBuild/ECS Express Mode + Vercel SPA deployment runbook
 ├── frontend/
 │   ├── public/
 │   ├── src/
@@ -240,12 +240,15 @@ curl -i http://127.0.0.1:8000/health
 Target delivery pipeline (prepared in repository; production publishing disabled by default):
 
 ```text
-GitHub -> AWS CodePipeline -> AWS CodeBuild (buildspec.yml) -> Amazon ECR (examination-hub-api) -> AWS App Runner (FastAPI, port 8000)
-                                                            └-> Vercel SPA (Root Directory = frontend, frontend/vercel.json)
+GitHub -> AWS CodePipeline -> AWS CodeBuild (buildspec.yml) -> Amazon ECR (examination-hub-api)
+                                                            -> Amazon ECS Express Mode / Fargate
+                                                            -> managed Application Load Balancer -> FastAPI (port 8000)
+
+GitHub -> Vercel SPA (Root Directory = frontend, frontend/vercel.json)
 ```
 
 See the full deployment, security, and coordination documentation:
-- [`docs/deployment-aws-vercel.md`](docs/deployment-aws-vercel.md) — AWS CodePipeline/CodeBuild, App Runner, Vercel SPA, Neon Dexta Global, and post-deploy smoke test runbook
+- [`docs/deployment-aws-vercel.md`](docs/deployment-aws-vercel.md) — AWS CodePipeline/CodeBuild, ECS Express Mode, Vercel SPA, Neon Dexta Global, and post-deploy smoke test runbook
 - [`docs/agent-coordination.md`](docs/agent-coordination.md) — Multi-agent & peer engineering ownership ledger and locked API contract
 
 ---
