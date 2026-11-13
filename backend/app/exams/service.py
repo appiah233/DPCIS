@@ -48,7 +48,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.attempts import models as attempt_models
 from app.auth.dependencies import ROLE_ADMIN, ROLE_STUDENT, AuthIdentity
 from app.exams import models as exam_models
-from app.exams.parser import parse_questions
+from app.exams.parser import parse_questions_with_answer_key
 from app.exams.schemas import (
     VALID_OPTION_LABELS,
     ExamAdminOut,
@@ -720,9 +720,11 @@ def close_exam(
     )
 
 
-def parse_questions_service(raw_text: str) -> ParseQuestionsResponse:
+def parse_questions_service(
+    raw_text: str, answer_key_text: str | None = None
+) -> ParseQuestionsResponse:
     """Parse pasted question text without persisting (preview only)."""
-    return parse_questions(raw_text)
+    return parse_questions_with_answer_key(raw_text, answer_key_text)
 
 
 # ---------------------------------------------------------------------------

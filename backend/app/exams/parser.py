@@ -144,6 +144,10 @@ ANSWER_DIRECTIVE = re.compile(
     re.IGNORECASE,
 )
 ANSWER_VALUE = re.compile(r"^([A-Za-z])[\.\)]?$")
+ANSWER_KEY_LINE = re.compile(
+    r"^\s*(?:Q(?:uestion)?\s*)?(\d+)\s*[\.:\)=-]\s*([A-Da-d])\s*$",
+    re.IGNORECASE,
+)
 
 VALID_LABELS: tuple[OptionLabel, ...] = ("A", "B", "C", "D")
 DEFAULT_POINTS = Decimal("1.00")
@@ -504,4 +508,99 @@ def parse_questions(raw_text: str) -> ParseQuestionsResponse:
         total_blocks=len(blocks),
         valid_count=len(valid_questions),
         error_count=len(all_errors),
+    )
+
+
+def parse_questions_with_answer_key(
+    raw_text: str, answer_key_text: str | None = None
+) -> ParseQuestionsResponse:
+    """Apply a separate, explicitly numbered key before normal MCQ validation.
+
+    Every question needs one matching key entry. Ambiguous, duplicate, extra,
+    or conflicting entries invalidate the whole preview, so an inaccurate key
+    can never be partially imported as ready questions. Work is O(N) in text
+    size plus the number of blocks and key lines.
+    """
+    if not answer_key_text or not answer_key_text.strip():
+        return parse_questions(raw_text)
+
+    normalized = _normalize_input(raw_text)
+    leading, blocks = _segment_blocks(normalized.splitlines())
+    problems: list[str] = []
+    key: dict[int, OptionLabel] = {}
+    for line_number, line in enumerate(_normalize_input(answer_key_text).splitlines(), start=1):
+        if not line.strip():
+            continue
+        match = ANSWER_KEY_LINE.fullmatch(line)
+        if match is None:
+            problems.append(f"answer key line {line_number} must look like '1. B'")
+            continue
+        number = int(match.group(1))
+        if number in key:
+            problems.append(f"duplicate answer for question {number}")
+        else:
+            key[number] = cast(OptionLabel, match.group(2).upper())
+
+    numbered_blocks: list[int] = []
+    for block in blocks:
+        match = QUESTION_START.match(block[0])
+        assert match is not None  # noqa: S101
+        number = int(match.group(1) or match.group(4))
+        if number in numbered_blocks:
+            problems.append(f"duplicate question number {number}")
+        numbered_blocks.append(number)
+        if any(ANSWER_DIRECTIVE.match(line) for line in block[1:]):
+            problems.append(
+                f"question {number} has an inline answer; use one answer source only"
+            )
+
+    question_numbers = set(numbered_blocks)
+    for number in sorted(question_numbers - key.keys()):
+        problems.append(f"missing answer for question {number}")
+    for number in sorted(key.keys() - question_numbers):
+        problems.append(f"answer key references missing question {number}")
+
+    if problems:
+        preview = parse_questions(raw_text)
+        message = "Correct the separate answer key before adding questions."
+        all_questions = preview.valid_questions + preview.invalid_questions
+        errors = list(preview.errors)
+        errors.extend(ParseQuestionsError(block_index=0, message=item) for item in problems)
+        for question in all_questions:
+            question.answer_label = None
+            question.valid = False
+            question.errors.append(message)
+            errors.append(ParseQuestionsError(block_index=question.position, message=message))
+        return ParseQuestionsResponse(
+            valid_questions=[],
+            invalid_questions=all_questions,
+            errors=errors,
+            total_blocks=preview.total_blocks,
+            valid_count=0,
+            error_count=len(errors),
+        )
+
+    combined = "\n".join(leading)
+    for number, block in zip(numbered_blocks, blocks, strict=True):
+        combined += "\n" + "\n".join(block).rstrip() + f"\nANSWER: {key[number]}\n"
+    preview = parse_questions(combined)
+    if not preview.errors:
+        return preview
+    message = "Correct every question and answer before adding this keyed set."
+    errors = list(preview.errors)
+    for question in preview.valid_questions:
+        question.valid = False
+        question.answer_label = None
+        question.errors.append(message)
+        errors.append(ParseQuestionsError(block_index=question.position, message=message))
+    return ParseQuestionsResponse(
+        valid_questions=[],
+        invalid_questions=sorted(
+            preview.valid_questions + preview.invalid_questions,
+            key=lambda question: question.position,
+        ),
+        errors=errors,
+        total_blocks=preview.total_blocks,
+        valid_count=0,
+        error_count=len(errors),
     )

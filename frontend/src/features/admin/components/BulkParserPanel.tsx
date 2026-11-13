@@ -60,9 +60,12 @@ export function BulkParserPanel({
 }: BulkParserPanelProps) {
   const baseId = useId();
   const textareaId = `${baseId}-raw-text`;
+  const answerKeyId = `${baseId}-answer-key`;
   const helpId = `${baseId}-format-help`;
 
   const [rawText, setRawText] = useState("");
+  const [answerKeyText, setAnswerKeyText] = useState("");
+  const [activeInput, setActiveInput] = useState<"questions" | "answers">("questions");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -79,21 +82,22 @@ export function BulkParserPanel({
     );
   }, [parseResult]);
 
-  const loadQuestionFile = async (file: File | undefined) => {
+  const loadTextFile = async (file: File | undefined, kind: "questions" | "answers") => {
     if (!file || disabled || isParsing) return;
     if (!/\.(txt|md)$/i.test(file.name) || file.size > 2 * 1024 * 1024) {
-      setRequestError("Choose a .txt or .md question file smaller than 2 MB.");
+      setRequestError("Choose a .txt or .md file smaller than 2 MB.");
       return;
     }
     try {
       const contents = await file.text();
       if (!contents.trim()) throw new Error("The selected file is empty.");
-      setRawText(contents);
+      if (kind === "questions") setRawText(contents);
+      else setAnswerKeyText(contents);
       setParseResult(null);
       setAppliedBanner(null);
       setRequestError(null);
     } catch {
-      setRequestError("The question file could not be read. Please try another text file.");
+      setRequestError("The file could not be read. Please try another text file.");
     }
   };
 
@@ -107,7 +111,7 @@ export function BulkParserPanel({
     setAppliedBanner(null);
 
     try {
-      const response = await parseQuestions(rawText);
+      const response = await parseQuestions(rawText, answerKeyText);
       setParseResult(response);
     } catch (error) {
       setRequestError(
@@ -181,11 +185,11 @@ export function BulkParserPanel({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <CardTitle as="h2" id={`${baseId}-heading`}>
-              Paste Questions
+              Import Questions and Answers
             </CardTitle>
             <CardDescription>
-              Paste or upload multiple-choice questions below to preview them and catch formatting issues
-              before adding them to your exam. Missing answers are flagged for you to choose.
+              Paste or upload questions and a separate answer key. Preview validates every answer
+              before it can be saved as the exam's marking key.
             </CardDescription>
           </div>
           <Badge variant="outline">
@@ -196,6 +200,18 @@ export function BulkParserPanel({
       </CardHeader>
 
       <CardContent className="space-y-5">
+        <div role="tablist" aria-label="Import content" className="flex gap-2 border-b border-border pb-3" onKeyDown={(event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const next = activeInput === "questions" ? "answers" : "questions";
+          setActiveInput(next);
+          const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+          tabs[next === "questions" ? 0 : 1]?.focus();
+        }}>
+          <Button id={`${baseId}-questions-tab`} type="button" role="tab" tabIndex={activeInput === "questions" ? 0 : -1} aria-selected={activeInput === "questions"} aria-controls={`${baseId}-questions-panel`} variant={activeInput === "questions" ? "default" : "outline"} onClick={() => setActiveInput("questions")}>Questions</Button>
+          <Button id={`${baseId}-answers-tab`} type="button" role="tab" tabIndex={activeInput === "answers" ? 0 : -1} aria-selected={activeInput === "answers"} aria-controls={`${baseId}-answers-panel`} variant={activeInput === "answers" ? "default" : "outline"} onClick={() => setActiveInput("answers")}>Answer key</Button>
+        </div>
+        <div id={`${baseId}-questions-panel`} role="tabpanel" aria-labelledby={`${baseId}-questions-tab`} hidden={activeInput !== "questions"} className="space-y-5">
         <div className="rounded-lg border border-border bg-muted/40 p-3.5 text-xs leading-relaxed text-muted-foreground">
           <p className="font-semibold text-foreground">Formatting guide</p>
           <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-foreground">
@@ -204,7 +220,7 @@ export function BulkParserPanel({
           <p id={helpId} className="mt-2">
             Also accepts <code>1)</code>, <code>Q1:</code>, lowercase <code>a.</code>/<code>a)</code>,
             and <code>Ans: X</code> or <code>Correct Answer: X</code>. Each question needs 2–4
-            options starting at <code>A</code> and a marked correct answer.
+            options starting at <code>A</code>. Use an inline answer or the separate Answer key tab.
           </p>
         </div>
 
@@ -270,7 +286,7 @@ export function BulkParserPanel({
           onDrop={(event) => {
             event.preventDefault();
             setIsDraggingFile(false);
-            void loadQuestionFile(event.dataTransfer.files[0]);
+            void loadTextFile(event.dataTransfer.files[0], "questions");
           }}
         >
           <Label htmlFor={`${baseId}-file`} className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium focus-within:outline-2 focus-within:outline-primary">
@@ -282,12 +298,44 @@ export function BulkParserPanel({
               disabled={disabled || isParsing}
               className="sr-only"
               onChange={(event) => {
-                void loadQuestionFile(event.target.files?.[0]);
+                void loadTextFile(event.target.files?.[0], "questions");
                 event.target.value = "";
               }}
             />
           </Label>
           <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md file here (up to 2 MB). Preview and save the questions before publishing.</p>
+        </div>
+        </div>
+
+        <div id={`${baseId}-answers-panel`} role="tabpanel" aria-labelledby={`${baseId}-answers-tab`} hidden={activeInput !== "answers"} className="space-y-5">
+          <div className="rounded-lg border border-border bg-muted/40 p-3.5 text-sm text-muted-foreground">
+            Enter one answer per numbered question, for example <code>1. B</code> and <code>2. A</code>.
+            Every question must have exactly one matching answer. Leave this empty when answers
+            are already marked inside the question text.
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={answerKeyId}>Answers used for marking</Label>
+            <Textarea id={answerKeyId} value={answerKeyText} disabled={disabled || isParsing} rows={10} className="min-h-56 font-mono text-sm" placeholder={"1. B\n2. A\n3. D"} onChange={(event) => {
+              setAnswerKeyText(event.target.value);
+              setParseResult(null);
+              setAppliedBanner(null);
+              setRequestError(null);
+            }} />
+          </div>
+          <div className={cn("rounded-lg border-2 border-dashed border-border p-4 text-center", isDraggingFile && "border-primary bg-accent")} onDragOver={(event) => { event.preventDefault(); if (!disabled) setIsDraggingFile(true); }} onDragLeave={() => setIsDraggingFile(false)} onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingFile(false);
+            void loadTextFile(event.dataTransfer.files[0], "answers");
+          }}>
+            <Label htmlFor={`${baseId}-answer-file`} className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium focus-within:outline-2 focus-within:outline-primary">
+              Choose answer file
+              <input id={`${baseId}-answer-file`} type="file" accept=".txt,.md,text/plain,text/markdown" disabled={disabled || isParsing} className="sr-only" onChange={(event) => {
+                void loadTextFile(event.target.files?.[0], "answers");
+                event.target.value = "";
+              }} />
+            </Label>
+            <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md answer key (up to 2 MB).</p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -346,20 +394,20 @@ export function BulkParserPanel({
                   <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
                   <div className="min-w-0 space-y-2">
                     <AlertTitle>
-                      {parseResult.error_count} question
+                      {parseResult.error_count} issue
                       {parseResult.error_count === 1 ? "" : "s"} need attention
                     </AlertTitle>
                     <AlertDescription>
                       <p className="mb-2">
-                        Fix the text above and preview again, or add these questions below to edit
-                        them directly.
+                        Fix the questions or answer key and preview again. Questions needing
+                        fixes can also be edited below before saving.
                       </p>
                       <ul className="list-disc space-y-1 pl-5 break-words">
                         {parseResult.errors.map((err, index) => (
                           <li key={`${err.block_index}-${index}`}>
                             <strong>
                               {err.block_index === 0
-                                ? "Formatting"
+                                ? "Answer key / formatting"
                                 : `Question #${err.block_index}`}
                               :
                             </strong>{" "}

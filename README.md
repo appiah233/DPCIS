@@ -13,7 +13,7 @@ Examination Hub is a responsive web application for creating, taking, and gradin
 - **Publish to students:** Published exams appear for all students. Administrators can close an exam to stop new attempts and review participant results.
 - **Take timed sittings:** Students move between questions, see only answered/unanswered progress, and can resume a saved attempt. FastAPI enforces the timer and final submission.
 - **Grade securely:** The server grades answers and controls score and answer-key disclosure after finalization. The browser never decides correctness or the final score.
-- **Separate access roles:** Neon Managed Auth handles sign-in; Neon PostgreSQL stores the authoritative `STUDENT` and `ADMIN` roles checked by FastAPI.
+- **Separate access roles:** Neon Managed Auth owns the user role; FastAPI checks it by verified user ID and mirrors it into the application user record.
 
 ---
 
@@ -23,7 +23,7 @@ The repository separates API logic, responsive browser UI, identity, database pe
 
 - **Backend (`backend/`):** Python 3.12 + FastAPI application (`app.main:create_app`) with environment-driven Pydantic v2 settings, strict security headers, sanitized error responses (`X-Request-ID`), SQLAlchemy 2.x + Alembic linear migrations, RBAC dependencies (`require_identity`, `require_student`, `require_admin`), deterministic MCQ parser (`app/exams/parser.py`), transactional attempt engine (`app/attempts/service.py`), and pure `Decimal` grading/expiry logic (`app/attempts/grading.py`).
 - **Frontend (`frontend/`):** React 19 + TypeScript + Vite + Tailwind CSS v4 + accessible UI primitives, `BrowserRouter` SPA routes (`/`, `/student/*`, `/admin/*`), Neon Managed Better Auth session integration (`@neondatabase/auth`), fail-closed `ProtectedRoute` guards, and Vercel SPA rewrite configuration (`frontend/vercel.json`).
-- **Authentication (Neon Managed Better Auth):** Owned externally by Neon Managed Better Auth. FastAPI verifies EdDSA Bearer JWTs via JWKS and resolves/upserts local PostgreSQL roles in `application_users` keyed by the immutable JWT subject (`auth_subject` / `sub`), never relying on email addresses or client-supplied role claims.
+- **Authentication and roles (Neon Managed Better Auth):** FastAPI verifies EdDSA Bearer JWTs via JWKS, reads the current role from `neon_auth.user` by the verified `sub`, and mirrors `admin`/`user` to `ADMIN`/`STUDENT` in `application_users`. Neon controls role changes; backend authorization never relies on email addresses or client-supplied role claims.
 - **Database:** Neon PostgreSQL managed via SQLAlchemy 2.x and Alembic migrations. Runtime traffic uses `DATABASE_URL` (pooled Neon endpoint recommended in deployed environments), while Alembic uses `DIRECT_DATABASE_URL` (falling back to `DATABASE_URL` when unset).
 
 ---
@@ -113,7 +113,7 @@ The repository separates API logic, responsive browser UI, identity, database pe
 - **Public & Identity:**
   - `GET /` — Application metadata (`name`, `version`, `environment`, `status`)
   - `GET /health` — Returns `{"status": "healthy"}` (`200`) with zero secrets or infrastructure details
-  - `GET /auth/me` — Requires valid Bearer JWT (`require_identity`), upserts `application_users` keyed by `auth_subject`, and returns `{user_id, auth_subject, email, display_name, role}`
+  - `GET /auth/me` — Requires valid Bearer JWT (`require_identity`), synchronizes the current Neon role into `application_users` by `auth_subject`, and returns `{user_id, auth_subject, email, display_name, role}`
 - **Admin Endpoints (`require_admin`, `/api/admin/*`):**
   - `POST /api/admin/exams`, `GET /api/admin/exams`, `GET /api/admin/exams/{exam_id}`, `PATCH /api/admin/exams/{exam_id}`, `DELETE /api/admin/exams/{exam_id}`
   - `POST /api/admin/exams/parse-questions` — Stateless deterministic MCQ parser preview
@@ -208,7 +208,7 @@ alembic upgrade head
 ## 9. Neon Managed Better Auth Configuration
 
 - **Hosted Auth Authority:** Authentication is managed externally by Neon Managed Better Auth (`VITE_NEON_AUTH_URL` on the frontend; `NEON_AUTH_JWKS_URL`, `NEON_AUTH_BASE_URL`, and optional `NEON_AUTH_AUDIENCE` on the backend).
-- **RBAC Isolation:** Application roles (`STUDENT`, `ADMIN`) live exclusively in PostgreSQL `application_users` keyed by `auth_subject`. Frontend routes enforce fail-closed guards when auth is unconfigured or unauthenticated, while FastAPI remains the sole authorization authority.
+- **RBAC Isolation:** Neon Managed Auth's `admin`/`user` role is read from `neon_auth.user` by verified JWT subject and mirrored as `ADMIN`/`STUDENT` in `application_users`. Frontend routes enforce fail-closed guards when auth is unconfigured or unauthenticated, while FastAPI remains the authorization enforcement point.
 
 ---
 

@@ -27,6 +27,7 @@ from app.main import create_app
 from app.users.service import (
     _get_users_table,
     get_application_user_by_subject,
+    get_managed_auth_role,
     upsert_application_user,
 )
 
@@ -402,6 +403,63 @@ def test_auth_me_coalesces_null_metadata_and_preserves_promoted_admin_role(
             "display_name": "Grace Admin",
             "role": ROLE_ADMIN,
         }
+
+
+def test_managed_role_promotes_and_revokes_admin_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    token = _make_eddsa_token(
+        private_key, sub="managed_admin", extra_claims={"role": "STUDENT"}
+    )
+    managed_role = {"value": ROLE_ADMIN}
+    monkeypatch.setattr(
+        auth_dependencies,
+        "get_managed_auth_role",
+        lambda _db, _subject: managed_role["value"],
+    )
+    test_client, session_factory = _build_auth_test_app(monkeypatch, private_key.public_key())
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with test_client as client:
+        promoted = client.get("/auth/me", headers=headers)
+        admin_allowed = client.get("/__test/admin-only", headers=headers)
+        assert promoted.status_code == 200
+        assert promoted.json()["role"] == ROLE_ADMIN
+        assert admin_allowed.status_code == 200
+
+        managed_role["value"] = ROLE_STUDENT
+        admin_denied = client.get("/__test/admin-only", headers=headers)
+        student_allowed = client.get("/__test/student-only", headers=headers)
+        assert admin_denied.status_code == 403
+        assert student_allowed.status_code == 200
+
+    with session_factory() as db:
+        stored = get_application_user_by_subject(db, "managed_admin")
+        assert stored is not None
+        assert stored.role == ROLE_STUDENT
+
+
+@pytest.mark.parametrize(
+    ("neon_role", "expected"),
+    [("admin", ROLE_ADMIN), ("user", ROLE_STUDENT), (None, ROLE_STUDENT),
+     ("owner", None)],
+)
+def test_managed_role_maps_only_known_neon_values(
+    neon_role: str | None, expected: str | None,
+) -> None:
+    calls: list[dict[str, str]] = []
+
+    def execute(_statement: object, parameters: dict[str, str]) -> SimpleNamespace:
+        calls.append(parameters)
+        return SimpleNamespace(one_or_none=lambda: SimpleNamespace(role=neon_role))
+
+    db = SimpleNamespace(
+        get_bind=lambda: SimpleNamespace(dialect=SimpleNamespace(name="postgresql")),
+        execute=execute,
+    )
+    assert get_managed_auth_role(db, "managed-subject") == expected  # type: ignore[arg-type]
+    assert calls == [{"subject": "managed-subject"}]
 
 
 def test_require_student_auto_provisions_student_and_populates_user_id(
