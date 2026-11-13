@@ -25,6 +25,7 @@ import { ConfirmDialog } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { parseQuestions } from "@/features/admin/adminApi";
+import { extractImportText } from "@/features/admin/extractImportText";
 import {
   extractAdminApiError,
   fromParsedQuestion,
@@ -46,8 +47,6 @@ B. 201 Created
 C. 404 Not Found
 D. 409 Conflict
 ANSWER: B`;
-
-const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
 
 export interface BulkParserPanelProps {
   disabled?: boolean;
@@ -85,23 +84,18 @@ export function BulkParserPanel({
     );
   }, [parseResult]);
 
-  const loadTextFile = async (file: File | undefined, kind: "questions" | "answers") => {
+  const loadImportFile = async (file: File | undefined, kind: "questions" | "answers") => {
     if (!file || disabled || isParsing || isReadingFile) return;
-    if (!/\.(txt|md)$/i.test(file.name) || file.size > MAX_IMPORT_FILE_BYTES) {
-      setRequestError("Choose a .txt or .md file up to 100 MB.");
-      return;
-    }
     setIsReadingFile(true);
     try {
-      const contents = await file.text();
-      if (!contents.trim()) throw new Error("The selected file is empty.");
+      const contents = await extractImportText(file);
       if (kind === "questions") setRawText(contents);
       else setAnswerKeyText(contents);
       setParseResult(null);
       setAppliedBanner(null);
       setRequestError(null);
-    } catch {
-      setRequestError("The file could not be read. Please try another text file.");
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : "The file could not be read. Please try another file.");
     } finally {
       setIsReadingFile(false);
     }
@@ -292,7 +286,7 @@ export function BulkParserPanel({
           onDrop={(event) => {
             event.preventDefault();
             setIsDraggingFile(false);
-            void loadTextFile(event.dataTransfer.files[0], "questions");
+            void loadImportFile(event.dataTransfer.files[0], "questions");
           }}
         >
           <Label htmlFor={`${baseId}-file`} className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium focus-within:outline-2 focus-within:outline-primary">
@@ -300,16 +294,16 @@ export function BulkParserPanel({
             <input
               id={`${baseId}-file`}
               type="file"
-              accept=".txt,.md,text/plain,text/markdown"
+              accept=".pdf,application/pdf"
               disabled={disabled || isParsing || isReadingFile}
               className="sr-only"
               onChange={(event) => {
-                void loadTextFile(event.target.files?.[0], "questions");
+                void loadImportFile(event.target.files?.[0], "questions");
                 event.target.value = "";
               }}
             />
           </Label>
-          <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md file here (up to 100 MB). Preview and save the questions before publishing.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a PDF up to 100 MB. The PDF must contain selectable text. Preview before publishing.</p>
         </div>
         </div>
 
@@ -331,16 +325,16 @@ export function BulkParserPanel({
           <div className={cn("rounded-lg border-2 border-dashed border-border p-4 text-center", isDraggingFile && "border-primary bg-accent")} onDragOver={(event) => { event.preventDefault(); if (!disabled) setIsDraggingFile(true); }} onDragLeave={() => setIsDraggingFile(false)} onDrop={(event) => {
             event.preventDefault();
             setIsDraggingFile(false);
-            void loadTextFile(event.dataTransfer.files[0], "answers");
+            void loadImportFile(event.dataTransfer.files[0], "answers");
           }}>
             <Label htmlFor={`${baseId}-answer-file`} className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium focus-within:outline-2 focus-within:outline-primary">
               Choose answer file
-              <input id={`${baseId}-answer-file`} type="file" accept=".txt,.md,text/plain,text/markdown" disabled={disabled || isParsing || isReadingFile} className="sr-only" onChange={(event) => {
-                void loadTextFile(event.target.files?.[0], "answers");
+              <input id={`${baseId}-answer-file`} type="file" accept=".pdf,application/pdf" disabled={disabled || isParsing || isReadingFile} className="sr-only" onChange={(event) => {
+                void loadImportFile(event.target.files?.[0], "answers");
                 event.target.value = "";
               }} />
             </Label>
-            <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md answer key (up to 100 MB).</p>
+            <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a PDF answer key up to 100 MB. The PDF must contain selectable text.</p>
           </div>
         </div>
 
@@ -362,7 +356,7 @@ export function BulkParserPanel({
 
         {requestError ? (
           <Alert variant="destructive" role="alert">
-            <AlertTitle>Could not preview questions</AlertTitle>
+            <AlertTitle>Could not import or preview</AlertTitle>
             <AlertDescription>{requestError}</AlertDescription>
           </Alert>
         ) : null}
