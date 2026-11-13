@@ -1,16 +1,19 @@
 # Examination Hub
 
-> **Current Stage:** Phase 2 Vertical Slice Implemented (Authoring, Timed Delivery, Grading & Deployment Readiness).  
-> The platform delivers end-to-end **Administrator** exam authoring, deterministic bulk MCQ parsing, preview/editing, publish/close lifecycle, and results oversight alongside **Student** discovery, timed exam delivery with server-authoritative countdown & autosave, idempotent submission/expiry, backend `Decimal` grading, answer-key isolation, and PostgreSQL RBAC (`application_users` keyed by `auth_subject`), plus Docker, CI, AWS CodeBuild, and Vercel SPA readiness.
+Examination Hub is a responsive web application for creating, taking, and grading timed multiple-choice examinations. Administrators prepare questions and exam rules; students take focused, one-question-at-a-time sittings with saved answers and a server-controlled timer. Final scores appear only after an attempt ends and only when the administrator enables results.
+
+**Project status:** The core authoring, exam delivery, grading, and role-based access flows are implemented. Live deployment connectivity and authenticated browser journeys still require end-to-end verification.
 
 ---
 
-## 1. Product Purpose
+## 1. What the project does
 
-Examination Hub is a responsive web examination platform (`320px`–`1440px+`) designed around two server-enforced roles (`ADMIN` and `STUDENT` in `application_users`):
-
-- **Students:** Sign in via Neon Managed Better Auth, browse published examinations (`/student`), inspect exam instructions and attempt limits (`/student/exams/:examId`), start or resume timed MCQ attempts (`/student/attempts/:attemptId`) with server-authoritative UTC `started_at`/`expires_at` countdowns and autosave, submit manually or automatically upon timer expiry, and view backend-graded scores (`/student/results/:attemptId`) gated by `show_result` and post-finalization `show_correct_answers`.
-- **Administrators:** Sign in via Neon Managed Better Auth, create and manage draft examinations (`/admin`, `/admin/exams/new`, `/admin/exams/:examId`), paste MCQ text or load a `.txt`/`.md` question file for preview and editing, configure duration, pass mark, question limits, maximum attempts, randomization, and result visibility, publish exams for all students or close them, and review participant results and attempt breakdowns (`/admin/exams/:examId/results`).
+- **Build exams:** Administrators set duration, questions per attempt, pass mark, retake limit, question and option order, and result visibility.
+- **Import questions:** Paste MCQ text or choose or drop a `.txt`/`.md` file, preview the parsed questions, correct them, and save them before publishing.
+- **Publish to students:** Published exams appear for all students. Administrators can close an exam to stop new attempts and review participant results.
+- **Take timed sittings:** Students move between questions, see only answered/unanswered progress, and can resume a saved attempt. FastAPI enforces the timer and final submission.
+- **Grade securely:** The server grades answers and controls score and answer-key disclosure after finalization. The browser never decides correctness or the final score.
+- **Separate access roles:** Neon Managed Auth handles sign-in; Neon PostgreSQL stores the authoritative `STUDENT` and `ADMIN` roles checked by FastAPI.
 
 ---
 
@@ -25,13 +28,17 @@ The repository separates API logic, responsive browser UI, identity, database pe
 
 ---
 
-## 3. Approved Technology Stack
+## 3. Tools and technologies
 
-- **Backend:** Python 3.12, FastAPI, Pydantic v2 (`pydantic-settings`), SQLAlchemy 2.x, `psycopg[binary]` (v3), Alembic, PyJWT (`EdDSA`), pytest, Ruff
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui-compatible components, React Router, `@neondatabase/auth`
-- **Authentication:** Neon Managed Better Auth (Google OAuth / email-password)
-- **Database:** Neon PostgreSQL
-- **Deployment / CI:** Docker (`python:3.12-slim`), GitHub Actions, AWS CodePipeline, AWS CodeBuild (`buildspec.yml`), Amazon ECR (`examination-hub-api`), Amazon ECS Express Mode on Fargate with managed HTTPS load balancing, Vercel (`frontend/vercel.json`), Amazon CloudWatch
+| Area | Tools | How they are used |
+|---|---|---|
+| Web interface | React 19, TypeScript, Vite, Tailwind CSS v4, React Router, accessible UI components | One responsive application for student and administrator workflows |
+| API and exam engine | Python 3.12, FastAPI, Pydantic, SQLAlchemy, `psycopg` | Exam authoring, question delivery, autosave, timer enforcement, grading, and authorization |
+| Accounts and data | Neon Managed Better Auth, Neon PostgreSQL | Account sessions and the database-backed `STUDENT`/`ADMIN` role and exam records |
+| Database changes | Alembic | Versioned, additive schema migrations |
+| Authentication checks | PyJWT and Neon JWKS | Verification of signed bearer tokens before API access |
+| Quality checks | pytest, Ruff, ESLint, TypeScript, GitHub Actions | Backend tests, static checks, frontend build, and CI |
+| Delivery | Docker, AWS CodePipeline/CodeBuild, Amazon ECR, Amazon ECS Express Mode, Vercel, CloudWatch | Backend build and hosting pipeline, separate frontend hosting, and logs; live connectivity is still being verified |
 
 ---
 
