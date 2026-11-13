@@ -158,7 +158,7 @@ export function AppShell({
             ? "max-w-4xl py-5 sm:py-6"
             : isLoginRoute
               ? "max-w-none p-0"
-              : "max-w-6xl py-6 sm:py-10",
+              : "max-w-7xl py-6 sm:py-10 lg:py-12",
         )}
       >
         <ErrorBoundary resetKeys={[pathname]}>
@@ -168,7 +168,7 @@ export function AppShell({
 
       {!isExamFocusMode && !isLoginRoute ? (
         <footer className="border-t border-border bg-card">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p>Examination Hub — Digital Assessment Platform</p>
             <p>Calm &amp; Focused Online Assessment</p>
           </div>

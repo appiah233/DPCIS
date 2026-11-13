@@ -74,7 +74,7 @@ export function parseQuestions(
   options?: ApiRequestOptions,
 ): Promise<ParseQuestionsResponse> {
   return apiPost<ParseQuestionsResponse>("/api/admin/exams/parse-questions", {
-    timeoutMs: 15000,
+    timeoutMs: 120000,
     ...options,
     body: { raw_text: rawText, answer_key_text: answerKeyText || null },
   });
