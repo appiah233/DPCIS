@@ -2,12 +2,12 @@
 
 :root {
   color-scheme: light;
-  --background: #f7f7f8;
-  --foreground: #18181b;
+  --background: #f6f7f8;
+  --foreground: #17202b;
   --card: #ffffff;
   --card-foreground: #18181b;
-  --muted: #f1f2f4;
-  --muted-foreground: #52525b;
+  --muted: #eef1f3;
+  --muted-foreground: #4b5563;
   --primary: #b91c1c;
   --primary-hover: #991b1b;
   --primary-foreground: #ffffff;
@@ -15,7 +15,7 @@
   --secondary-foreground: #18181b;
   --accent: #fef2f2;
   --accent-foreground: #991b1b;
-  --border: #e4e4e7;
+  --border: #dfe4e8;
   --input: #71717a;
   --ring: #b91c1c;
   --success: #166534;
@@ -331,6 +331,126 @@
   border-color: var(--primary);
 }
 
+/* Student and administrator workspaces share a calm, editorial dashboard system. */
+.portal-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  background: #172330;
+  color: #fff;
+  box-shadow: 0 28px 60px -40px rgb(13 24 35 / 0.55);
+}
+
+.portal-hero::before,
+.portal-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.portal-hero::before {
+  inline-size: min(52rem, 85vw);
+  aspect-ratio: 1;
+  inset-block-start: -29rem;
+  inset-inline-end: -9rem;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow: 0 0 0 6rem rgb(255 255 255 / 0.025), 0 0 0 12rem rgb(255 255 255 / 0.018);
+}
+
+.portal-hero::after {
+  inline-size: 35rem;
+  aspect-ratio: 1;
+  inset-block-end: -27rem;
+  inset-inline-end: 8%;
+  background: rgb(185 28 28 / 0.22);
+  filter: blur(5rem);
+}
+
+.portal-hero-student {
+  background: linear-gradient(115deg, #162636, #24384a 68%, #3a2933);
+}
+
+.portal-hero-admin {
+  background: linear-gradient(115deg, #192532, #263340 70%, #392631);
+}
+
+.portal-eyebrow {
+  color: #ffc8be;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.portal-panel {
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--card);
+  box-shadow: 0 15px 35px -30px rgb(13 24 35 / 0.35);
+}
+
+.portal-stat {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.1rem;
+  background: #fff;
+  box-shadow: 0 12px 28px -25px rgb(13 24 35 / 0.4);
+}
+
+.portal-stat::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 1.25rem;
+  block-size: 3px;
+  border-radius: 0 0 999px 999px;
+  background: #be3331;
+}
+
+.portal-list-row {
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.portal-list-row:hover {
+  background: #f8fafb;
+  transform: translateX(2px);
+}
+
+.portal-exam-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  box-shadow: 0 18px 38px -32px rgb(13 24 35 / 0.4);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.portal-exam-card::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 4px;
+  background: linear-gradient(90deg, #a8171c, #da5a4d 70%, #edb1a2);
+}
+
+.portal-exam-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 23px 42px -29px rgb(13 24 35 / 0.32);
+}
+
+.portal-reveal {
+  animation: portal-rise 500ms ease-out both;
+}
+
+@keyframes portal-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Container-aware card grid */
 .card-grid {
   display: grid;
@@ -513,6 +633,11 @@ dialog.exam-dialog::backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .portal-reveal { animation: none; }
+  .portal-list-row,
+  .portal-exam-card { transition: none; }
+  .portal-list-row:hover,
+  .portal-exam-card:hover { transform: none; }
   .mcq-option-card,
   .exam-progress::-webkit-progress-value {
     transition: none;

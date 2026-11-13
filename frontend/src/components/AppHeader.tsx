@@ -238,15 +238,15 @@ export function AppHeader({
           "header-inner mx-auto flex min-h-16 items-center justify-between gap-3 sm:gap-4",
           pathname === "/" && !isAuthenticated
             ? "max-w-none px-6 sm:px-10 lg:px-14"
-            : "max-w-6xl px-4 sm:px-6",
+            : "max-w-7xl px-4 sm:px-6",
         )}
       >
         <div className="flex min-w-0 items-center gap-3">
           <NavLink
             to="/"
-            className="inline-flex min-h-11 items-center gap-2.5 rounded-md px-1.5 text-base font-semibold tracking-tight text-foreground no-underline hover:text-primary"
+            className="inline-flex min-h-11 items-center gap-2.5 rounded-md px-1.5 text-base font-bold tracking-tight text-foreground no-underline hover:text-primary"
           >
-            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <ShieldCheck className="size-4" aria-hidden="true" />
             </span>
             <span>Examination Hub</span>

@@ -26,10 +26,10 @@ export function StudentExamCard({ exam }: StudentExamCardProps) {
   const attemptsRemaining = Math.max(0, exam.max_attempts - exam.attempts_used);
 
   return (
-    <Card>
-      <CardHeader className="gap-3">
+    <Card className="portal-exam-card">
+      <CardHeader className="gap-4 pt-7">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <CardTitle as="h3" className="text-lg">
+          <CardTitle as="h3" className="text-xl font-semibold tracking-tight">
             {exam.title}
           </CardTitle>
 
@@ -57,7 +57,7 @@ export function StudentExamCard({ exam }: StudentExamCardProps) {
       </CardHeader>
 
       <CardContent>
-        <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/40 p-3.5 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-5 rounded-xl border border-border bg-slate-50 p-4 text-sm">
           <div className="min-w-0">
             <dt className="text-xs font-medium text-muted-foreground">Duration</dt>
             <dd className="mt-0.5 font-semibold tabular-nums text-foreground">
@@ -85,7 +85,7 @@ export function StudentExamCard({ exam }: StudentExamCardProps) {
         </dl>
       </CardContent>
 
-      <CardFooter className="justify-between">
+      <CardFooter className="flex-wrap justify-between gap-3 border-t border-border pt-5">
         <span className="text-xs text-muted-foreground tabular-nums">
           {hasActiveAttempt
             ? "Sitting in progress — ready to continue"

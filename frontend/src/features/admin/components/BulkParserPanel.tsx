@@ -47,6 +47,8 @@ C. 404 Not Found
 D. 409 Conflict
 ANSWER: B`;
 
+const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
+
 export interface BulkParserPanelProps {
   disabled?: boolean;
   existingQuestionCount: number;
@@ -67,6 +69,7 @@ export function BulkParserPanel({
   const [answerKeyText, setAnswerKeyText] = useState("");
   const [activeInput, setActiveInput] = useState<"questions" | "answers">("questions");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [isReadingFile, setIsReadingFile] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [parseResult, setParseResult] = useState<ParseQuestionsResponse | null>(null);
@@ -83,11 +86,12 @@ export function BulkParserPanel({
   }, [parseResult]);
 
   const loadTextFile = async (file: File | undefined, kind: "questions" | "answers") => {
-    if (!file || disabled || isParsing) return;
-    if (!/\.(txt|md)$/i.test(file.name) || file.size > 2 * 1024 * 1024) {
-      setRequestError("Choose a .txt or .md file smaller than 2 MB.");
+    if (!file || disabled || isParsing || isReadingFile) return;
+    if (!/\.(txt|md)$/i.test(file.name) || file.size > MAX_IMPORT_FILE_BYTES) {
+      setRequestError("Choose a .txt or .md file up to 100 MB.");
       return;
     }
+    setIsReadingFile(true);
     try {
       const contents = await file.text();
       if (!contents.trim()) throw new Error("The selected file is empty.");
@@ -98,11 +102,13 @@ export function BulkParserPanel({
       setRequestError(null);
     } catch {
       setRequestError("The file could not be read. Please try another text file.");
+    } finally {
+      setIsReadingFile(false);
     }
   };
 
   const handleParse = async () => {
-    if (disabled || isParsing) {
+    if (disabled || isParsing || isReadingFile) {
       return;
     }
 
@@ -232,7 +238,7 @@ export function BulkParserPanel({
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={disabled || isParsing}
+                disabled={disabled || isParsing || isReadingFile}
                 onClick={() => {
                   setRawText(SAMPLE_FORMAT_TEXT);
                   setParseResult(null);
@@ -248,7 +254,7 @@ export function BulkParserPanel({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={disabled || isParsing}
+                  disabled={disabled || isParsing || isReadingFile}
                   onClick={() => {
                     setRawText("");
                     setParseResult(null);
@@ -265,7 +271,7 @@ export function BulkParserPanel({
           <Textarea
             id={textareaId}
             value={rawText}
-            disabled={disabled || isParsing}
+            disabled={disabled || isParsing || isReadingFile}
             aria-describedby={helpId}
             rows={10}
             className="min-h-56 font-mono text-sm"
@@ -295,7 +301,7 @@ export function BulkParserPanel({
               id={`${baseId}-file`}
               type="file"
               accept=".txt,.md,text/plain,text/markdown"
-              disabled={disabled || isParsing}
+              disabled={disabled || isParsing || isReadingFile}
               className="sr-only"
               onChange={(event) => {
                 void loadTextFile(event.target.files?.[0], "questions");
@@ -303,7 +309,7 @@ export function BulkParserPanel({
               }}
             />
           </Label>
-          <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md file here (up to 2 MB). Preview and save the questions before publishing.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md file here (up to 100 MB). Preview and save the questions before publishing.</p>
         </div>
         </div>
 
@@ -315,7 +321,7 @@ export function BulkParserPanel({
           </div>
           <div className="space-y-2">
             <Label htmlFor={answerKeyId}>Answers used for marking</Label>
-            <Textarea id={answerKeyId} value={answerKeyText} disabled={disabled || isParsing} rows={10} className="min-h-56 font-mono text-sm" placeholder={"1. B\n2. A\n3. D"} onChange={(event) => {
+            <Textarea id={answerKeyId} value={answerKeyText} disabled={disabled || isParsing || isReadingFile} rows={10} className="min-h-56 font-mono text-sm" placeholder={"1. B\n2. A\n3. D"} onChange={(event) => {
               setAnswerKeyText(event.target.value);
               setParseResult(null);
               setAppliedBanner(null);
@@ -329,23 +335,23 @@ export function BulkParserPanel({
           }}>
             <Label htmlFor={`${baseId}-answer-file`} className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium focus-within:outline-2 focus-within:outline-primary">
               Choose answer file
-              <input id={`${baseId}-answer-file`} type="file" accept=".txt,.md,text/plain,text/markdown" disabled={disabled || isParsing} className="sr-only" onChange={(event) => {
+              <input id={`${baseId}-answer-file`} type="file" accept=".txt,.md,text/plain,text/markdown" disabled={disabled || isParsing || isReadingFile} className="sr-only" onChange={(event) => {
                 void loadTextFile(event.target.files?.[0], "answers");
                 event.target.value = "";
               }} />
             </Label>
-            <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md answer key (up to 2 MB).</p>
+            <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a .txt or .md answer key (up to 100 MB).</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            disabled={disabled || isParsing}
+            disabled={disabled || isParsing || isReadingFile}
             onClick={() => void handleParse()}
           >
             <ListChecks className="size-4" aria-hidden="true" />
-            <span>{isParsing ? "Previewing..." : "Preview Questions"}</span>
+            <span>{isReadingFile ? "Reading file..." : isParsing ? "Previewing..." : "Preview Questions"}</span>
           </Button>
           {disabled ? (
             <span className="text-xs text-muted-foreground">

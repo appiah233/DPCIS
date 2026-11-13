@@ -34,6 +34,8 @@ Role synchronization update (Codex, 2026-11-13): Backend now reads `neon_auth."u
 
 Separate answer-key import update (Codex, 2026-11-13): Admin question importer now has Questions and Answer key tabs, each with paste and `.txt`/`.md` drag/drop. The preview API accepts optional `answer_key_text` and requires exactly one numbered key entry per question; duplicate, missing, extra, malformed, conflicting inline answers, or labels absent from options invalidate the keyed preview. Validated answer labels become `is_correct` in the existing save flow, and the existing server grading path remains authoritative. Files: `backend/app/exams/{schemas.py,parser.py,service.py,router.py}`, `backend/tests/test_parser.py`, `frontend/src/features/admin/{adminApi.ts,components/BulkParserPanel.tsx}`. Local full backend tests, frontend lint and build passed; rendered browser check and live Neon verification remain pending.
 
+Import-size update (Codex, 2026-11-13): The admin `.txt`/`.md` question and answer-key selectors now accept files up to 100 MiB (displayed as 100 MB). File reading has an in-progress state so preview cannot race a large read; the preview request timeout is 120 seconds. Files: `frontend/src/features/admin/{adminApi.ts,components/BulkParserPanel.tsx}`. This changes the client gate only; large end-to-end upload/parse latency on the deployed load balancer remains unverified.
+
 | WORKSTREAM | OWNER | STATUS | FILES/DIRECTORIES | DEPENDENCIES | LAST UPDATE | BLOCKER | HANDOFF NOTES |
 |---|---|---|---|---|---|---|---|
 | Neon Auth restoration | Codex | IMPLEMENTED_LOCAL | `backend/app/auth/*`, `backend/app/config.py`, `frontend/src/lib/*`, `frontend/src/features/auth/*`, env templates | Neon Managed Auth for credentials; Neon PostgreSQL `application_users.role` for authorization | 2026-11-13 | Deployed backend/frontend configuration remains unverified | Reverted Cognito-specific code, dependency, callback, tests and local auth settings. New accounts default to STUDENT; ADMIN requires an authorized database role update. No client or token role claim grants access. |
@@ -114,6 +116,13 @@ Root health & identity routes reside at `/`, and all domain routes are mounted u
 ---
 
 ## 5. Phase 3 Next Handoff Priorities
+
+### Local frontend workspace redesign (2026-11-13)
+
+- **WORKSTREAM / OWNER / STATUS:** Student and admin portal visual design / Codex / local implementation, frontend lint and production build passed; rendered responsive verification remains pending.
+- **FILES:** `frontend/src/pages/StudentDashboardPage.tsx`, `frontend/src/pages/AdminOverviewPage.tsx`, `frontend/src/features/student/StudentExamCard.tsx`, `frontend/src/components/{AppHeader,PageHeader}.tsx`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/index.css`.
+- **HANDOFF:** The dashboards now use the existing API responses for metrics, lists, and next actions. No new routes or backend contracts. Keep active exam focus mode unchanged. Review authenticated pages at the required viewport widths before deployment. The user supplied the Figma Community reference `1060254185809770803` for both portal designs; its exact frames could not be retrieved from this workspace, so the implementation uses dashboard layout ideas without claiming pixel parity. The UI UX Designer guidance was reviewed.
+- **RELATED LOCAL CHANGE:** Question and answer text-file importer accepts up to 100 MiB in the browser and permits a longer preview request. Backend/proxy capacity for the largest payload is not yet measured.
 
 1. **Non-Production Neon Branch & Credential Rotation (User-Authorized — `RULE 5`, `RULE 14`):**
    - Create a non-production `testing` (or `staging`) branch inside **Dexta Global** (`org-weathered-mud-72902193`, project `noisy-boat-95673317`).
