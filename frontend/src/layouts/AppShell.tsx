@@ -91,6 +91,7 @@ export function AppShell({
 
   const routeMeta = resolveRouteMetadata(pathname);
   const isExamFocusMode = examFocusModeOverride ?? routeMeta.examFocusMode ?? false;
+  const isLoginRoute = pathname === "/";
 
   const focusPrimaryContent = () => {
     const mainEl = mainRef.current;
@@ -153,7 +154,11 @@ export function AppShell({
         ref={mainRef}
         className={cn(
           "mx-auto w-full flex-1 px-4 outline-none sm:px-6",
-          isExamFocusMode ? "max-w-4xl py-5 sm:py-6" : "max-w-6xl py-6 sm:py-10",
+          isExamFocusMode
+            ? "max-w-4xl py-5 sm:py-6"
+            : isLoginRoute
+              ? "max-w-none p-0"
+              : "max-w-6xl py-6 sm:py-10",
         )}
       >
         <ErrorBoundary resetKeys={[pathname]}>
@@ -161,7 +166,7 @@ export function AppShell({
         </ErrorBoundary>
       </main>
 
-      {!isExamFocusMode ? (
+      {!isExamFocusMode && !isLoginRoute ? (
         <footer className="border-t border-border bg-card">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p>Examination Hub — Digital Assessment Platform</p>

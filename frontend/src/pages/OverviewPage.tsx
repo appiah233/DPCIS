@@ -1,4 +1,4 @@
-import { ArrowUpRight, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 
@@ -10,10 +10,9 @@ import { useAuth } from "@/features/auth/useAuth";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
 
 const REASSURANCE_ITEMS = [
-  "Calm, focused single-question experience",
-  "Answers saved automatically as you work",
-  "Clear countdown timer during your examination",
-  "Results shown when permitted by your administrator",
+  "One question at a time",
+  "Your answers save as you work",
+  "Results after your sitting ends",
 ] as const;
 
 export function OverviewPage() {
@@ -91,28 +90,24 @@ export function OverviewPage() {
   }
 
   return (
-    <div className="auth-stage grid min-h-[min(760px,calc(100dvh-12rem))] overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-[0_24px_90px_-48px_rgb(24_24_27/0.38)] lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-      <section className="auth-story relative isolate flex min-h-[320px] flex-col justify-between overflow-hidden px-6 py-8 text-white sm:px-10 sm:py-10 lg:min-h-[650px] lg:px-12 lg:py-12">
-        <div className="auth-story-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-        <div className="auth-orbit auth-orbit-one pointer-events-none absolute" aria-hidden="true" />
-        <div className="auth-orbit auth-orbit-two pointer-events-none absolute" aria-hidden="true" />
-        <div className="auth-orbit-core pointer-events-none absolute" aria-hidden="true"><Sparkles className="size-10" /></div>
+    <div className="auth-stage grid min-h-[calc(100dvh-4rem)] w-full bg-card lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+      <section className="auth-story relative isolate flex min-h-[380px] flex-col justify-end overflow-hidden px-6 py-7 text-white sm:px-10 sm:py-10 lg:min-h-[calc(100dvh-4rem)] lg:px-14 lg:py-12">
+        <img
+          src="/images/student-study-hero.png"
+          alt="University students studying together in a library"
+          className="auth-story-image absolute inset-0 h-full w-full object-cover"
+        />
 
-        <div className="auth-reveal relative z-10 flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl border border-white/25 bg-white/10 shadow-lg shadow-black/10"><ShieldCheck className="size-5" aria-hidden="true" /></span>
-          <span className="text-sm font-semibold tracking-[0.16em] uppercase">Examination Hub</span>
-        </div>
-
-        <div className="auth-reveal auth-reveal-late relative z-10 max-w-xl space-y-5 lg:space-y-7">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90 backdrop-blur-sm"><span className="size-1.5 rounded-full bg-rose-200" />A better way to assess</span>
-          <h1 tabIndex={-1} className="max-w-[12ch] text-4xl leading-[1.06] font-semibold tracking-[-0.045em] outline-none sm:text-5xl lg:text-[clamp(3rem,5vw,4.8rem)]">
-            Your next chapter starts here<span className="text-rose-200">.</span>
+        <div className="auth-reveal auth-reveal-late relative z-10 max-w-2xl space-y-4 lg:space-y-6">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/20 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm"><span className="size-1.5 rounded-full bg-rose-200" />A space to do your best</span>
+          <h1 tabIndex={-1} className="max-w-[13ch] text-4xl leading-[1.04] font-semibold tracking-[-0.045em] outline-none sm:text-5xl lg:text-[clamp(3.25rem,4.5vw,5.5rem)]">
+            Own the moment. Show what you know<span className="text-rose-200">.</span>
           </h1>
-          <p className="max-w-md text-sm leading-7 text-white/80 sm:text-base">
-            A clear space to focus, make progress, and finish with confidence.
+          <p className="max-w-lg text-sm leading-7 text-white/90 sm:text-base">
+            Focus on each question. We&apos;ll keep your progress safe while you work.
           </p>
           {isConfigured ? (
-            <ul aria-label="Examination experience highlights" className="grid gap-2 text-sm text-white/85 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <ul aria-label="Examination experience highlights" className="hidden gap-x-6 gap-y-2 text-sm text-white/90 sm:grid sm:grid-cols-2">
               {REASSURANCE_ITEMS.map((item) => (
                 <li key={item} className="flex items-start gap-2.5">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-rose-200" aria-hidden="true" />
@@ -122,12 +117,9 @@ export function OverviewPage() {
             </ul>
           ) : null}
         </div>
-        <div className="auth-reveal auth-reveal-late relative z-10 hidden items-center gap-2 text-xs font-medium tracking-wide text-white/60 lg:flex">
-          MADE FOR FOCUSED LEARNING <ArrowUpRight className="size-4" aria-hidden="true" />
-        </div>
       </section>
 
-      <section aria-label="Account access" className="auth-form-column flex min-w-0 flex-col justify-center gap-6 px-5 py-8 sm:px-10 sm:py-12 lg:px-[clamp(2rem,5vw,4.5rem)]">
+      <section aria-label="Account access" className="auth-form-column flex min-w-0 flex-col justify-center gap-6 px-5 py-8 sm:px-10 sm:py-12 lg:px-[clamp(2rem,5vw,5rem)]">
         {healthState.kind === "unreachable" ? (
           <Alert variant="warning" role="status">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
