@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.attempts.router import router as attempts_router
-from app.auth.dependencies import AuthIdentity, require_identity
+from app.auth.dependencies import AuthIdentity, _current_managed_role, require_identity
 from app.config import Settings, get_settings
 from app.database.session import dispose_engine, get_db
 from app.exams.router import router as exams_router
@@ -147,6 +147,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             auth_subject=identity.subject,
             email=identity.email,
             display_name=identity.name,
+            managed_role=_current_managed_role(db, identity.subject),
         )
         return {
             "user_id": str(user.id),

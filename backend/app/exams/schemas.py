@@ -374,6 +374,7 @@ class ParsedQuestion(BaseModel):
 
 class ParseQuestionsRequest(BaseModel):
     raw_text: str
+    answer_key_text: str | None = None
 
 
 class ParseQuestionsError(BaseModel):

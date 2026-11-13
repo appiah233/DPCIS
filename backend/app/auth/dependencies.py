@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 
 from app.config import ConfigurationError, Settings, get_settings
 from app.database.session import get_db
-from app.users.service import get_application_user_by_subject, upsert_application_user
+from app.users.service import (
+    get_application_user_by_subject,
+    get_managed_auth_role,
+    upsert_application_user,
+)
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -128,11 +132,7 @@ def require_identity(
 
 
 def _load_application_user(db: Session, auth_subject: str) -> tuple[UUID, str] | None:
-    """Load the authoritative ``(user_id, role)`` from ``application_users``.
-
-    Never trust role claims from the browser or JWT; the database row is the
-    source of truth.
-    """
+    """Load the application user ID and mirrored role from PostgreSQL."""
     user = get_application_user_by_subject(db, auth_subject)
     if user is None:
         return None
@@ -147,27 +147,34 @@ def _load_application_role(db: Session, auth_subject: str) -> str | None:
     return loaded[1]
 
 
+def _current_managed_role(db: Session, auth_subject: str) -> str | None:
+    role = get_managed_auth_role(db, auth_subject)
+    if role is None and db.get_bind().dialect.name == "postgresql":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Managed authentication role unavailable",
+        )
+    return role
+
+
 def require_student(
     identity: AuthIdentity = Depends(require_identity),
     db: Session = Depends(get_db),
 ) -> AuthIdentity:
     """Require an authenticated identity whose application role is STUDENT.
 
-    Unauthenticated -> 401. If no ``application_users`` row exists yet for a
-    verified JWT subject, safely auto-provisions a default ``STUDENT`` account
-    so student endpoints cannot race ``/auth/me``. Non-STUDENT -> 403.
+    The verified JWT subject resolves to Neon's current role. PostgreSQL
+    application users mirror it before the student permission check.
     """
-    loaded = _load_application_user(db, identity.subject)
-    if loaded is None:
-        provisioned = upsert_application_user(
-            db,
-            auth_subject=identity.subject,
-            email=identity.email,
-            display_name=identity.name,
-        )
-        user_id, role = provisioned.id, provisioned.role
-    else:
-        user_id, role = loaded
+    managed_role = _current_managed_role(db, identity.subject)
+    provisioned = upsert_application_user(
+        db,
+        auth_subject=identity.subject,
+        email=identity.email,
+        display_name=identity.name,
+        managed_role=managed_role,
+    )
+    user_id, role = provisioned.id, provisioned.role
 
     if role != ROLE_STUDENT:
         raise HTTPException(
@@ -189,10 +196,21 @@ def require_admin(
 ) -> AuthIdentity:
     """Require an authenticated identity whose application role is ADMIN.
 
-    Strictly fail-closed (never auto-provisions an admin).
-    Unauthenticated or unprovisioned -> 401. Authenticated but not an admin -> 403.
+    PostgreSQL reads Neon's current role before the admin permission check.
+    An unknown managed role fails closed.
     """
-    loaded = _load_application_user(db, identity.subject)
+    managed_role = _current_managed_role(db, identity.subject)
+    if managed_role is not None:
+        provisioned = upsert_application_user(
+            db,
+            auth_subject=identity.subject,
+            email=identity.email,
+            display_name=identity.name,
+            managed_role=managed_role,
+        )
+        loaded = provisioned.id, provisioned.role
+    else:
+        loaded = _load_application_user(db, identity.subject)
     if loaded is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

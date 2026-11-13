@@ -76,7 +76,7 @@ def parse_questions_route(
     identity: AuthIdentity = Depends(require_admin),
 ) -> ParseQuestionsResponse:
     service.require_admin_user_id(identity)
-    return service.parse_questions_service(data.raw_text)
+    return service.parse_questions_service(data.raw_text, data.answer_key_text)
 
 
 @admin_router.get(

@@ -1,8 +1,8 @@
 """Application users persistence and identity-resolution service.
 
 Maps Neon Managed Better Auth subjects (JWT ``sub``) to local PostgreSQL
-``application_users`` records. Application roles are strictly owned by the
-database and are never derived from client tokens or request payloads.
+``application_users`` records. Application roles are read from Neon's managed
+user table and mirrored locally; client token role claims are never used.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from sqlalchemy import (
     Uuid,
     func,
     select,
+    text,
     update,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -30,6 +31,29 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 DEFAULT_STUDENT_ROLE = "STUDENT"
+
+
+def get_managed_auth_role(db: Session, auth_subject: str) -> str | None:
+    """Read the current Better Auth role for a verified JWT subject.
+
+    Managed Auth and application data share the same Neon branch. Never read a
+    role from JWT metadata, email, or a browser request. SQLite is used only by
+    isolated tests and has no Neon-managed schema.
+    """
+    if db.get_bind().dialect.name != "postgresql":
+        return None
+    row = db.execute(
+        text('SELECT role FROM neon_auth."user" WHERE id = :subject'),
+        {"subject": _normalize_subject(auth_subject)},
+    ).one_or_none()
+    if row is None:
+        return None
+    role = row.role
+    if role is None or role == "user":
+        return DEFAULT_STUDENT_ROLE
+    if role == "admin":
+        return "ADMIN"
+    return None
 
 # Isolated metadata fallback used only if app.users.models is not yet loaded.
 # Never attached to Base.metadata so ORM table registration cannot collide.
@@ -134,17 +158,20 @@ def upsert_application_user(
     auth_subject: str,
     email: str | None,
     display_name: str | None,
+    managed_role: str | None = None,
     commit: bool = True,
 ) -> ApplicationUserRecord:
     """Idempotently provision or refresh an ``application_users`` row by ``auth_subject``.
 
-    New accounts are always inserted with ``role='STUDENT'``. Existing accounts
-    preserve their database-authoritative ``role`` and keep existing non-null
-    ``email`` / ``display_name`` values when incoming claims are ``None``.
+    New accounts default to ``STUDENT``. When a role was read from Neon's
+    managed user table, mirror it on insert and update. Existing non-null
+    ``email`` / ``display_name`` values survive sparse JWT claims.
     """
     clean_subject = _normalize_subject(auth_subject)
     clean_email = _normalize_optional_text(email)
     clean_name = _normalize_optional_text(display_name)
+    if managed_role not in {None, "STUDENT", "ADMIN"}:
+        raise ValueError("Invalid managed auth role")
     table = _get_users_table()
     now = datetime.now(UTC)
 
@@ -158,7 +185,7 @@ def upsert_application_user(
             auth_subject=clean_subject,
             email=clean_email,
             display_name=clean_name,
-            role=DEFAULT_STUDENT_ROLE,
+            role=managed_role or DEFAULT_STUDENT_ROLE,
             created_at=now,
             updated_at=now,
         )
@@ -168,6 +195,7 @@ def upsert_application_user(
                 "email": func.coalesce(stmt.excluded.email, table.c.email),
                 "display_name": func.coalesce(stmt.excluded.display_name, table.c.display_name),
                 "updated_at": now,
+                **({"role": managed_role} if managed_role is not None else {}),
             },
         ).returning(
             table.c.id,
@@ -195,7 +223,7 @@ def upsert_application_user(
                     auth_subject=clean_subject,
                     email=clean_email,
                     display_name=clean_name,
-                    role=DEFAULT_STUDENT_ROLE,
+                    role=managed_role or DEFAULT_STUDENT_ROLE,
                     created_at=now,
                     updated_at=now,
                 )
@@ -220,6 +248,7 @@ def upsert_application_user(
             email=clean_email if clean_email is not None else existing.email,
             display_name=clean_name if clean_name is not None else existing.display_name,
             updated_at=now,
+            **({"role": managed_role} if managed_role is not None else {}),
         )
     )
     if commit:

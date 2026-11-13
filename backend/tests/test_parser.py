@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.exams.parser import parse_questions
+from app.exams.parser import parse_questions, parse_questions_with_answer_key
 from app.exams.schemas import (
     OptionLabel,
     ParsedOption,
@@ -72,6 +72,44 @@ def test_parse_canonical_four_option_mcq() -> None:
         ("D", "Takoradi"),
     ]
     assert q.answer_label == "A"
+
+
+def test_separate_answer_key_marks_exact_numbered_questions() -> None:
+    questions = """1. First?
+A. Yes
+B. No
+2. Second?
+A. Left
+B. Right"""
+    response = parse_questions_with_answer_key(questions, "1. B\n2: A")
+    _assert_response_invariants(response)
+    assert response.valid_count == 2
+    assert [q.answer_label for q in response.valid_questions] == ["B", "A"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["1. B", "1. B\n1. A\n2. A", "1. B\n2. C", "1. B\n2. A\n3. B", "1. B\n2. Z"],
+)
+def test_separate_answer_key_rejects_incomplete_ambiguous_or_invalid_key(key: str) -> None:
+    questions = """1. First?
+A. Yes
+B. No
+2. Second?
+A. Left
+B. Right"""
+    response = parse_questions_with_answer_key(questions, key)
+    _assert_response_invariants(response)
+    assert response.valid_count == 0
+    assert all(q.answer_label is None for q in response.invalid_questions)
+
+
+def test_separate_answer_key_rejects_inline_conflict() -> None:
+    questions = "1. First?\nA. Yes\nB. No\nANSWER: A"
+    response = parse_questions_with_answer_key(questions, "1. B")
+    _assert_response_invariants(response)
+    assert response.valid_count == 0
+    assert any("inline answer" in error.message for error in response.errors)
 
 
 def test_parse_two_and_three_option_questions() -> None:

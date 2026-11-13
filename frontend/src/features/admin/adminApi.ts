@@ -70,12 +70,13 @@ export function deleteAdminExam(
 
 export function parseQuestions(
   rawText: string,
+  answerKeyText?: string,
   options?: ApiRequestOptions,
 ): Promise<ParseQuestionsResponse> {
   return apiPost<ParseQuestionsResponse>("/api/admin/exams/parse-questions", {
     timeoutMs: 15000,
     ...options,
-    body: { raw_text: rawText },
+    body: { raw_text: rawText, answer_key_text: answerKeyText || null },
   });
 }
 
