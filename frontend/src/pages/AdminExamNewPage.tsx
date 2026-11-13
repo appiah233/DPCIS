@@ -34,7 +34,7 @@ export function AdminExamNewPage() {
       <PageHeader
         eyebrow="Admin Dashboard"
         title="Create Examination"
-        description="Set the title, timing, pass mark, and student result settings. You can add or paste questions on the next screen."
+        description="Set the duration, question count, retake limit, and result settings. On the next screen, paste or upload questions, save them, then publish the exam for students."
         action={
           <Button asChild variant="outline">
             <Link to="/admin/exams">

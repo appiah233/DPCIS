@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleDashed } from "lucide-react";
+import { CircleDashed, CircleDot } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,8 +43,8 @@ export function QuestionNavigatorDialog({
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="success" className="tabular-nums">
-            <CheckCircle2 className="size-3.5" aria-hidden="true" />
+          <Badge variant="secondary" className="tabular-nums">
+            <CircleDot className="size-3.5" aria-hidden="true" />
             <span>{answeredCount} Answered</span>
           </Badge>
           <Badge variant="secondary" className="tabular-nums">
@@ -74,14 +74,14 @@ export function QuestionNavigatorDialog({
                   isCurrent
                     ? "border-primary bg-accent text-accent-foreground ring-2 ring-primary/25"
                     : isAnswered
-                      ? "border-success-border bg-success-subtle text-success hover:bg-success-subtle/80"
+                      ? "border-border bg-muted text-foreground hover:bg-muted/80"
                       : "border-border bg-card text-foreground hover:bg-muted",
                 )}
               >
                 <span className="flex w-full items-center justify-between gap-1.5 text-sm font-semibold tabular-nums">
                   <span>Q{index + 1}</span>
                   {isAnswered ? (
-                    <CheckCircle2 className="size-3.5 shrink-0" aria-hidden="true" />
+                    <CircleDot className="size-3.5 shrink-0" aria-hidden="true" />
                   ) : (
                     <CircleDashed className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                   )}
