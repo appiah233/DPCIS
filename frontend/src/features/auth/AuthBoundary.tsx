@@ -322,13 +322,19 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
       .join(" ") || undefined;
 
   return (
-    <Card className="mx-auto w-full max-w-md">
-      <CardHeader className="space-y-1.5">
-        <CardTitle as="h2">
-          {mode === "sign-in" ? "Sign in to your account" : "Create your account"}
+    <Card className="auth-card mx-auto w-full max-w-md">
+      <CardHeader className="space-y-3 pb-5">
+        <span className="auth-eyebrow inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-[0.68rem] font-bold tracking-[0.16em] uppercase">
+          <span className="auth-eyebrow-dot size-1.5 rounded-full" aria-hidden="true" />
+          Secure account access
+        </span>
+        <CardTitle as="h2" className="text-3xl leading-tight font-semibold tracking-[-0.04em] sm:text-[2.15rem]">
+          {mode === "sign-in" ? "Welcome back" : "Join Examination Hub"}
         </CardTitle>
-        <CardDescription>
-          Use your email and password or institutional Google account to continue.
+        <CardDescription className="max-w-sm">
+          {mode === "sign-in"
+            ? "Sign in to continue your examinations."
+            : "Create an account to discover your examinations."}
         </CardDescription>
       </CardHeader>
 
@@ -348,7 +354,7 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
                 id={nameInputId}
                 name="name"
                 required
-                className="min-h-[44px]"
+                className="auth-input min-h-[48px]"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 autoComplete="name"
@@ -366,7 +372,7 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
               name="email"
               required
               type="email"
-              className="min-h-[44px]"
+              className="auth-input min-h-[48px]"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
@@ -405,7 +411,7 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
               required
               minLength={8}
               type={showPassword ? "text" : "password"}
-              className="min-h-[44px]"
+              className="auth-input min-h-[48px]"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
@@ -420,7 +426,7 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
             ) : null}
           </div>
 
-          <Button type="submit" size="default" className="min-h-[44px] w-full" disabled={isSubmitting}>
+          <Button type="submit" size="default" className="auth-submit min-h-[48px] w-full" disabled={isSubmitting}>
             {mode === "sign-up" ? (
               <UserPlus className="size-4" aria-hidden="true" />
             ) : (
@@ -448,7 +454,7 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
           type="button"
           variant="outline"
           size="default"
-          className="min-h-[44px] w-full"
+          className="auth-google min-h-[48px] w-full"
           disabled={isSubmitting}
           onClick={handleGoogleSignIn}
         >
@@ -457,7 +463,7 @@ export function AuthBoundary({ onAuthSuccess }: AuthBoundaryProps = {}) {
         </Button>
       </CardContent>
 
-      <CardFooter className="justify-center pt-0">
+      <CardFooter className="justify-center border-0 pt-0">
         <Button
           type="button"
           variant="ghost"
