@@ -66,6 +66,7 @@ class AttemptQuestionDelivery(BaseModel):
     id: UUID
     display_order: int
     question_text: str
+    image_urls: list[str] = Field(default_factory=list)
     points: Decimal
     options: list[AttemptOptionDelivery] = Field(default_factory=list)
 

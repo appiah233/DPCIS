@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attempt Screen — Option A (Docked Right Navigator Rail)</title>
+    <style>
+      :root {
+        --bg-canvas: #f7f8fa;
+        --bg-surface: #ffffff;
+        --bg-subtle: #f1f3f6;
+        --bg-accent-subtle: #fef2f2;
+        --text-primary: #111827;
+        --text-secondary: #4b5563;
+        --text-muted: #6b7280;
+        --border-default: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --accent-primary: #b91c1c;
+        --accent-hover: #991b1b;
+        --success-bg: #f0fdf4;
+        --success-text: #166534;
+        --success-border: #86efac;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg-canvas);
+        color: var(--text-primary);
+        line-height: 1.5;
+      }
+      .direction-banner {
+        background: #111827;
+        color: #f9fafb;
+        padding: 8px 24px;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .direction-banner strong { color: #fca5a5; }
+      .focus-topbar {
+        height: 56px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border-default);
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .brand-mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        background: var(--accent-primary);
+        color: #fff;
+        font-weight: 700;
+        font-size: 12px;
+        display: grid;
+        place-items: center;
+      }
+      .exam-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .exam-meta {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .save-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--success-bg);
+        color: var(--success-text);
+        border: 1px solid var(--success-border);
+      }
+      .timer-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: var(--bg-surface);
+        font-size: 14px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .submit-top-btn {
+        height: 38px;
+        padding: 0 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--bg-surface);
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .workspace {
+        max-width: 1200px;
+        margin: 24px auto;
+        padding: 0 24px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 288px;
+        gap: 24px;
+        align-items: start;
+      }
+      .question-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-xs);
+        overflow: hidden;
+      }
+      .question-card-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border-default);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fcfcfd;
+      }
+      .q-kicker {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--accent-primary);
+      }
+      .q-points {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-default);
+        background: var(--bg-subtle);
+        color: var(--text-secondary);
+      }
+      .question-body {
+        padding: 24px;
+      }
+      .question-stem {
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.55;
+        color: var(--text-primary);
+        max-width: 68ch;
+        margin-bottom: 20px;
+      }
+      .stimulus-box {
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        background: #fafbfc;
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+      .options-list {
+        display: grid;
+        gap: 10px;
+      }
+      .option-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 14px 16px;
+        border-radius: var(--radius-md);
+        border: 1.5px solid var(--border-default);
+        background: var(--bg-surface);
+      }
+      .option-row.selected {
+        border-color: var(--accent-primary);
+        background: var(--bg-accent-subtle);
+      }
+      .option-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 1.5px solid var(--border-strong);
+        display: grid;
+        place-items: center;
+        font-size: 13px;
+        font-weight: 700;
+        flex-shrink: 0;
+        background: var(--bg-surface);
+      }
+      .option-row.selected .option-badge {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: #ffffff;
+      }
+      .option-text {
+        flex: 1;
+        font-size: 15px;
+        padding-top: 3px;
+      }
+      .option-selected-tag {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent-primary);
+        padding-top: 5px;
+      }
+      .question-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--border-default);
+        background: #fcfcfd;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .btn {
+        height: 42px;
+        padding: 0 18px;
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btn-outline {
+        border: 1px solid var(--border-strong);
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+      .btn-primary {
+        border: 1px solid var(--accent-primary);
+        background: var(--accent-primary);
+        color: #fff;
+      }
+      .nav-rail {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        padding: 18px;
+        box-shadow: var(--shadow-xs);
+      }
+      .rail-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+      }
+      .progress-summary {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        font-variant-numeric: tabular-nums;
+      }
+      .progress-track {
+        height: 6px;
+        border-radius: 999px;
+        background: var(--bg-subtle);
+        overflow: hidden;
+        margin-bottom: 16px;
+      }
+      .progress-fill {
+        width: 45%;
+        height: 100%;
+        background: var(--accent-primary);
+      }
+      .q-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .q-tile {
+        height: 40px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-default);
+        background: var(--bg-surface);
+        font-size: 13px;
+        font-weight: 600;
+        display: grid;
+        place-items: center;
+        font-variant-numeric: tabular-nums;
+      }
+      .q-tile.answered {
+        background: var(--bg-subtle);
+        border-color: var(--border-strong);
+        color: var(--text-primary);
+      }
+      .q-tile.current {
+        background: var(--bg-accent-subtle);
+        border: 2px solid var(--accent-primary);
+        color: var(--accent-primary);
+        font-weight: 700;
+      }
+      .legend {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        padding-top: 12px;
+        border-top: 1px solid var(--border-default);
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        border: 1px solid var(--border-strong);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="direction-banner">
+      <span><strong>OPTION A — Docked Right Navigator Rail</strong> (Moodle 4 / Canvas New Quizzes / HackerRank pattern)</span>
+      <span>Desktop: 2-column (760px question + 288px sticky rail) · Mobile: rail collapses to modal sheet</span>
+    </div>
+
+    <header class="focus-topbar">
+      <div class="brand-lockup">
+        <div class="brand-mark">EH</div>
+        <div>
+          <div class="exam-title">Data Protection &amp; Cybersecurity Fundamentals</div>
+          <div class="exam-meta">Sitting in progress · Auto-saved to server</div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <span class="save-pill">✓ Saved 2s ago</span>
+        <div class="timer-pill" role="timer">⏱ Time left: 28:42</div>
+        <button class="submit-top-btn" type="button">Finish Attempt…</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="question-card" aria-label="Active question">
+        <div class="question-card-header">
+          <span class="q-kicker">Question 3 of 20</span>
+          <span class="q-points">2 pts</span>
+        </div>
+
+        <div class="question-body">
+          <p class="question-stem">
+            Refer to the network topology diagram below. Which switch interface carries tagged VLAN 20 trunk traffic between the Core and Distribution layers?
+          </p>
+
+          <div class="stimulus-box">
+            <svg width="100%" height="110" viewBox="0 0 640 110" xmlns="http://www.w3.org/2000/svg">
+              <rect x="20" y="25" width="160" height="60" rx="6" fill="#ffffff" stroke="#991b1b" stroke-width="1.5"/>
+              <text x="48" y="60" font-family="sans-serif" font-size="14" font-weight="600" fill="#111827">Core Switch A</text>
+              <line x1="180" y1="55" x2="360" y2="55" stroke="#b91c1c" stroke-width="3"/>
+              <text x="230" y="45" font-family="sans-serif" font-size="12" font-weight="600" fill="#b91c1c">Trunk Gi0/1 (VLAN 20)</text>
+              <rect x="360" y="25" width="180" height="60" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+              <text x="385" y="60" font-family="sans-serif" font-size="14" font-weight="600" fill="#111827">Distribution Switch B</text>
+            </svg>
+          </div>
+
+          <div class="options-list">
+            <div class="option-row selected">
+              <span class="option-badge">A</span>
+              <span class="option-text">Interface GigabitEthernet0/1 (802.1Q trunk encapsulation)</span>
+              <span class="option-selected-tag">✓ Selected</span>
+            </div>
+            <div class="option-row">
+              <span class="option-badge">B</span>
+              <span class="option-text">Interface FastEthernet0/2 (Access port VLAN 10)</span>
+            </div>
+            <div class="option-row">
+              <span class="option-badge">C</span>
+              <span class="option-text">Interface Loopback0 (Control plane management)</span>
+            </div>
+            <div class="option-row">
+              <span class="option-badge">D</span>
+              <span class="option-text">Interface Vlan99 (Out-of-band gateway)</span>
+            </div>
+          </div>
+        </div>
+
+        <footer class="question-footer">
+          <button class="btn btn-outline" type="button">← Previous</button>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-primary" type="button">Next Question →</button>
+          </div>
+        </footer>
+      </section>
+
+      <aside class="nav-rail" aria-label="Question navigator">
+        <div class="rail-title">Question Map</div>
+        <div class="progress-summary">
+          <span>Answered</span>
+          <strong>9 of 20 (45%)</strong>
+        </div>
+        <div class="progress-track"><div class="progress-fill"></div></div>
+
+        <div class="q-grid">
+          <div class="q-tile answered">1</div>
+          <div class="q-tile answered">2</div>
+          <div class="q-tile current">3</div>
+          <div class="q-tile answered">4</div>
+          <div class="q-tile">5</div>
+          <div class="q-tile answered">6</div>
+          <div class="q-tile answered">7</div>
+          <div class="q-tile">8</div>
+          <div class="q-tile answered">9</div>
+          <div class="q-tile answered">10</div>
+          <div class="q-tile">11</div>
+          <div class="q-tile">12</div>
+          <div class="q-tile answered">13</div>
+          <div class="q-tile">14</div>
+          <div class="q-tile">15</div>
+          <div class="q-tile">16</div>
+          <div class="q-tile">17</div>
+          <div class="q-tile">18</div>
+          <div class="q-tile">19</div>
+          <div class="q-tile">20</div>
+        </div>
+
+        <div class="legend">
+          <div class="legend-item"><span class="swatch" style="border:2px solid #b91c1c;background:#fef2f2;"></span> Current</div>
+          <div class="legend-item"><span class="swatch" style="background:#f1f3f6;"></span> Answered (9)</div>
+          <div class="legend-item"><span class="swatch" style="background:#fff;"></span> Unanswered (11)</div>
+        </div>
+      </aside>
+    </main>
+  </body>
+</html>

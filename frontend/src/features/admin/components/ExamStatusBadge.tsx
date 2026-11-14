@@ -1,6 +1,3 @@
-import { CheckCircle2, Lock, Pencil } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
 import type { ExamStatus } from "@/types/adminExam";
 
 export interface ExamStatusBadgeProps {
@@ -10,26 +7,33 @@ export interface ExamStatusBadgeProps {
 export function ExamStatusBadge({ status }: ExamStatusBadgeProps) {
   if (status === "PUBLISHED") {
     return (
-      <Badge variant="success">
-        <CheckCircle2 className="size-3.5" aria-hidden="true" />
+      <span className="admin-pill ok">
+        <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m5 12 5 5 9-10" />
+        </svg>
         <span>Published</span>
-      </Badge>
+      </span>
     );
   }
 
   if (status === "CLOSED") {
     return (
-      <Badge variant="secondary">
-        <Lock className="size-3.5" aria-hidden="true" />
+      <span className="admin-pill nt">
+        <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
         <span>Closed</span>
-      </Badge>
+      </span>
     );
   }
 
   return (
-    <Badge variant="warning">
-      <Pencil className="size-3.5" aria-hidden="true" />
+    <span className="admin-pill wn">
+      <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 20h4L19 9l-4-4L4 16z" />
+      </svg>
       <span>Draft</span>
-    </Badge>
+    </span>
   );
 }

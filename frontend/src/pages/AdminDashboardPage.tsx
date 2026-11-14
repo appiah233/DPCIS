@@ -1,38 +1,32 @@
-import {
-  BarChart3,
-  Plus,
-  RefreshCw,
-  Search,
-  Trash2,
-} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  ResponsiveTable,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableRowHead,
-} from "@/components/ui/responsive-table";
+  SegmentedControl,
+  SegmentedControlItem,
+} from "@/components/ui/segmented-control";
 import {
-  EmptyStatePanel,
   ErrorStatePanel,
   LoadingStatePanel,
 } from "@/components/ui/state-panel";
-import { deleteAdminExam, listAdminExams } from "@/features/admin/adminApi";
+import {
+  closeAdminExam,
+  createAdminExam,
+  deleteAdminExam,
+  getAdminExam,
+  getAdminExamResults,
+  listAdminExams,
+  saveExamQuestions,
+} from "@/features/admin/adminApi";
 import {
   extractAdminApiError,
   formatDateTime,
   formatDecimal,
+  fromAdminQuestions,
+  toQuestionCreates,
 } from "@/features/admin/adminUtils";
 import { ExamStatusBadge } from "@/features/admin/components/ExamStatusBadge";
 import type { ExamAdminOut, ExamStatus } from "@/types/adminExam";
@@ -48,6 +42,7 @@ const FILTER_OPTIONS: readonly { value: StatusFilter; label: string }[] = [
 
 export function AdminDashboardPage() {
   const [exams, setExams] = useState<ExamAdminOut[]>([]);
+  const [attemptCounts, setAttemptCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -58,6 +53,9 @@ export function AdminDashboardPage() {
 
   const [examToDelete, setExamToDelete] = useState<ExamAdminOut | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [examToClose, setExamToClose] = useState<ExamAdminOut | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   const triggerReload = useCallback(() => {
     setReloadToken((n) => n + 1);
@@ -91,6 +89,31 @@ export function AdminDashboardPage() {
       controller.abort();
     };
   }, [reloadToken]);
+
+  useEffect(() => {
+    if (exams.length === 0) {
+      setAttemptCounts({});
+      return;
+    }
+    const controller = new AbortController();
+    void Promise.all(
+      exams.map(async (exam) => {
+        try {
+          const res = await getAdminExamResults(exam.id, {
+            signal: controller.signal,
+          });
+          return [exam.id, res.summary.completed_attempts] as const;
+        } catch {
+          return [exam.id, 0] as const;
+        }
+      }),
+    ).then((pairs) => {
+      if (!controller.signal.aborted) {
+        setAttemptCounts(Object.fromEntries(pairs));
+      }
+    });
+    return () => controller.abort();
+  }, [exams]);
 
   const counts = useMemo(() => {
     let draft = 0;
@@ -149,42 +172,107 @@ export function AdminDashboardPage() {
     }
   };
 
+  const handleConfirmClose = async () => {
+    if (!examToClose || isClosing) {
+      return;
+    }
+    setIsClosing(true);
+    setActionError(null);
+    setActionNotice(null);
+
+    try {
+      const updated = await closeAdminExam(examToClose.id);
+      setExams((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setExamToClose(null);
+      setActionNotice(`Closed examination "${updated.title}".`);
+    } catch (error) {
+      setActionError(
+        extractAdminApiError(error, "Unable to close examination.").message,
+      );
+      setExamToClose(null);
+    } finally {
+      setIsClosing(false);
+    }
+  };
+
+  const handleDuplicateExam = async (exam: ExamAdminOut) => {
+    if (duplicatingId) {
+      return;
+    }
+    setDuplicatingId(exam.id);
+    setActionError(null);
+    setActionNotice(null);
+
+    try {
+      const fullExam = await getAdminExam(exam.id);
+      const created = await createAdminExam({
+        title: `${fullExam.title} (Copy)`,
+        description: fullExam.description,
+        instructions: fullExam.instructions,
+        duration_minutes: fullExam.duration_minutes,
+        pass_mark: fullExam.pass_mark,
+        max_attempts: fullExam.max_attempts,
+        question_limit: fullExam.question_limit,
+        randomize_questions: fullExam.randomize_questions,
+        randomize_options: fullExam.randomize_options,
+        show_result: fullExam.show_result,
+        show_correct_answers: fullExam.show_correct_answers,
+      });
+      if (fullExam.questions && fullExam.questions.length > 0) {
+        const editable = fromAdminQuestions(fullExam.questions);
+        await saveExamQuestions(created.id, toQuestionCreates(editable));
+      }
+      triggerReload();
+      setActionNotice(`Duplicated "${exam.title}" as a new draft.`);
+    } catch (error) {
+      setActionError(
+        extractAdminApiError(error, "Unable to duplicate examination.").message,
+      );
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
   return (
-    <div className="space-y-8">
+    <section id="examinations">
       <PageHeader
-        eyebrow="Examination management"
-        title="Examinations"
-        description="Find, prepare, and manage your examinations."
+        eyebrow="Examinations"
+        title="Manage examinations"
+        description="Find, prepare and publish your examinations."
         action={
           <>
-            <Button
+            <button
+              className="admin-btn"
               type="button"
-              variant="outline"
               disabled={isLoading}
               onClick={triggerReload}
             >
-              <RefreshCw className="size-4" aria-hidden="true" />
-              <span>Refresh</span>
-            </Button>
-            <Button asChild>
-              <Link to="/admin/exams/new">
-                <Plus className="size-4" aria-hidden="true" />
-                <span>Create Examination</span>
-              </Link>
-            </Button>
+              <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />
+              </svg>
+              Refresh
+            </button>
+            <Link className="admin-btn p" to="/admin/exams/new">
+              <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Create examination
+            </Link>
           </>
         }
       />
 
       {actionError ? (
-        <Alert variant="destructive" role="alert">
+        <Alert variant="destructive" role="alert" className="mb-4">
           <AlertTitle>Action could not be completed</AlertTitle>
           <AlertDescription>{actionError}</AlertDescription>
         </Alert>
       ) : null}
 
       {actionNotice ? (
-        <Alert variant="success" role="status">
+        <Alert variant="success" role="status" className="mb-4">
           <AlertTitle>Examination updated</AlertTitle>
           <AlertDescription>{actionNotice}</AlertDescription>
         </Alert>
@@ -199,189 +287,249 @@ export function AdminDashboardPage() {
           onRetry={triggerReload}
         />
       ) : (
-        <>
-          {exams.length === 0 ? (
-            <EmptyStatePanel
-              title="No examinations created yet"
-              description="Start by creating a draft examination, setting timing and pass mark rules, and adding questions."
-              action={
-                <Button asChild>
-                  <Link to="/admin/exams/new">
-                    <Plus className="size-4" aria-hidden="true" />
-                    <span>Create Examination</span>
-                  </Link>
-                </Button>
-              }
-            />
-          ) : (
-            <section aria-labelledby="exam-directory-heading" className="space-y-4">
-              <h2 id="exam-directory-heading" className="visually-hidden">
-                Examinations Directory
-              </h2>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
-                  {FILTER_OPTIONS.map((option) => {
-                    const count =
-                      option.value === "ALL"
-                        ? counts.all
-                        : option.value === "DRAFT"
-                          ? counts.draft
-                          : option.value === "PUBLISHED"
-                            ? counts.published
-                            : counts.closed;
-                    const isSelected = statusFilter === option.value;
+        <div className="admin-card">
+          <div className="admin-tb">
+            <SegmentedControl ariaLabel="Filter by status">
+              {FILTER_OPTIONS.map((option) => {
+                const count =
+                  option.value === "ALL"
+                    ? counts.all
+                    : option.value === "DRAFT"
+                      ? counts.draft
+                      : option.value === "PUBLISHED"
+                        ? counts.published
+                        : counts.closed;
+                const isSelected = statusFilter === option.value;
+                return (
+                  <SegmentedControlItem
+                    key={option.value}
+                    active={isSelected}
+                    count={count}
+                    onClick={() => setStatusFilter(option.value)}
+                  >
+                    {option.label}
+                  </SegmentedControlItem>
+                );
+              })}
+            </SegmentedControl>
+
+            <label className="admin-sr">
+              <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                id="q"
+                type="search"
+                value={searchQuery}
+                placeholder="Search examinations"
+                aria-label="Search examinations"
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </label>
+          </div>
+
+          {filteredExams.length > 0 ? (
+            <div className="admin-tw">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Examination</th>
+                    <th>Status</th>
+                    <th className="n">Questions</th>
+                    <th className="n">Duration</th>
+                    <th className="n">Pass mark</th>
+                    <th className="n">Attempts</th>
+                    <th>Last updated</th>
+                    <th aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody id="tb">
+                  {filteredExams.map((exam) => {
+                    const subLabel =
+                      exam.status === "PUBLISHED"
+                        ? "Opens to students now"
+                        : exam.status === "CLOSED"
+                          ? "Closed to new sittings"
+                          : exam.question_count === 0
+                            ? "No questions yet"
+                            : `${exam.question_count} ${exam.question_count === 1 ? "question" : "questions"} ready`;
+                    const attemptsCount = attemptCounts[exam.id] ?? 0;
+
                     return (
-                      <Button
-                        key={option.value}
-                        type="button"
-                        variant={isSelected ? "default" : "outline"}
-                        size="sm"
-                        aria-pressed={isSelected}
-                        onClick={() => setStatusFilter(option.value)}
-                      >
-                        <span>
-                          {option.label} ({count})
-                        </span>
-                      </Button>
+                      <tr key={exam.id} data-s={exam.status.toLowerCase()}>
+                        <td className="admin-tn">
+                          <Link
+                            to={`/admin/exams/${exam.id}`}
+                            className="no-underline hover:underline"
+                          >
+                            <b>{exam.title}</b>
+                          </Link>
+                          <span>{subLabel}</span>
+                        </td>
+                        <td>
+                          <ExamStatusBadge status={exam.status} />
+                        </td>
+                        <td className="n">{exam.question_count}</td>
+                        <td className="n">{exam.duration_minutes} min</td>
+                        <td className="n">
+                          {formatDecimal(exam.pass_mark, "%")}
+                        </td>
+                        <td className="n">{attemptsCount}</td>
+                        <td>{formatDateTime(exam.updated_at)}</td>
+                        <td>
+                          <div className="admin-act">
+                            {exam.status === "DRAFT" ? (
+                              <Link
+                                className="admin-btn sm p"
+                                to={`/admin/exams/${exam.id}`}
+                              >
+                                <svg
+                                  className="admin-icon"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M4 20h4L19 9l-4-4L4 16z" />
+                                </svg>
+                                Edit draft
+                              </Link>
+                            ) : (
+                              <>
+                                <Link
+                                  className="admin-btn sm"
+                                  to={`/admin/exams/${exam.id}/results`}
+                                >
+                                  <svg
+                                    className="admin-icon"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+                                  </svg>
+                                  Results
+                                </Link>
+                                <Link
+                                  className="admin-btn sm p"
+                                  to={`/admin/exams/${exam.id}`}
+                                >
+                                  View
+                                </Link>
+                              </>
+                            )}
+
+                            <details className="admin-dd">
+                              <summary
+                                className="admin-btn sm sq"
+                                aria-label={`More actions for ${exam.title}`}
+                              >
+                                <svg
+                                  className="admin-icon"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden="true"
+                                >
+                                  <circle cx="5" cy="12" r="1.5" />
+                                  <circle cx="12" cy="12" r="1.5" />
+                                  <circle cx="19" cy="12" r="1.5" />
+                                </svg>
+                              </summary>
+                              <div className="admin-dm">
+                                <button
+                                  type="button"
+                                  disabled={duplicatingId === exam.id}
+                                  onClick={(event) => {
+                                    const details =
+                                      event.currentTarget.closest("details");
+                                    if (details) details.open = false;
+                                    void handleDuplicateExam(exam);
+                                  }}
+                                >
+                                  <svg
+                                    className="admin-icon"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                  >
+                                    <rect
+                                      x="9"
+                                      y="9"
+                                      width="12"
+                                      height="12"
+                                      rx="2"
+                                    />
+                                    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                                  </svg>
+                                  Duplicate
+                                </button>
+
+                                {exam.status === "PUBLISHED" ? (
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      const details =
+                                        event.currentTarget.closest("details");
+                                      if (details) details.open = false;
+                                      setExamToClose(exam);
+                                    }}
+                                  >
+                                    <svg
+                                      className="admin-icon"
+                                      viewBox="0 0 24 24"
+                                      aria-hidden="true"
+                                    >
+                                      <circle cx="12" cy="12" r="9" />
+                                      <path d="M12 7v5l3 2" />
+                                    </svg>
+                                    Close examination
+                                  </button>
+                                ) : null}
+
+                                {exam.status === "DRAFT" ? (
+                                  <button
+                                    type="button"
+                                    className="d"
+                                    onClick={(event) => {
+                                      const details =
+                                        event.currentTarget.closest("details");
+                                      if (details) details.open = false;
+                                      setExamToDelete(exam);
+                                    }}
+                                  >
+                                    <svg
+                                      className="admin-icon"
+                                      viewBox="0 0 24 24"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                                    </svg>
+                                    Delete draft
+                                  </button>
+                                ) : null}
+                              </div>
+                            </details>
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
-
-                <div className="relative w-full sm:w-72">
-                  <Label htmlFor="admin-exam-search" className="visually-hidden">
-                    Search examinations by title
-                  </Label>
-                  <Search
-                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id="admin-exam-search"
-                    type="search"
-                    value={searchQuery}
-                    placeholder="Search examinations..."
-                    className="pl-9"
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                  />
-                </div>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="admin-empty" id="none">
+              <div className="admin-ic">
+                <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
               </div>
-
-              {filteredExams.length === 0 ? (
-                <EmptyStatePanel
-                  title="No examinations match your filters"
-                  description="Clear the search box or switch the status filter to view other examinations."
-                  action={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setStatusFilter("ALL");
-                        setSearchQuery("");
-                      }}
-                    >
-                      Reset filters
-                    </Button>
-                  }
-                />
-              ) : (
-                <ResponsiveTable caption="Examinations directory" hideCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Examination</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Questions</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Pass Mark</TableHead>
-                      <TableHead>Max Attempts</TableHead>
-                      <TableHead>Updated</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredExams.map((exam) => (
-                      <TableRow key={exam.id}>
-                        <TableRowHead>
-                          <div className="min-w-0 space-y-1">
-                            <Link
-                              to={`/admin/exams/${exam.id}`}
-                              className="inline-flex min-h-11 items-center py-1 break-words font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline"
-                            >
-                              {exam.title}
-                            </Link>
-                            {exam.description ? (
-                              <p className="line-clamp-2 text-xs font-normal text-muted-foreground">
-                                {exam.description}
-                              </p>
-                            ) : null}
-                          </div>
-                        </TableRowHead>
-
-                        <TableCell label="Status">
-                          <ExamStatusBadge status={exam.status} />
-                        </TableCell>
-
-                        <TableCell label="Questions" className="tabular-nums">
-                          <span>{exam.question_count}</span>
-                          {exam.question_limit !== null ? (
-                            <span className="ml-1 text-xs text-muted-foreground">
-                              (limit {exam.question_limit})
-                            </span>
-                          ) : null}
-                        </TableCell>
-
-                        <TableCell label="Duration" className="tabular-nums">
-                          {exam.duration_minutes} min
-                        </TableCell>
-
-                        <TableCell label="Pass Mark" className="tabular-nums">
-                          {formatDecimal(exam.pass_mark, "%")}
-                        </TableCell>
-
-                        <TableCell label="Max Attempts" className="tabular-nums">
-                          {exam.max_attempts}
-                        </TableCell>
-
-                        <TableCell label="Updated" className="text-xs text-muted-foreground">
-                          {formatDateTime(exam.updated_at)}
-                        </TableCell>
-
-                        <TableCell label="Actions" stackOnMobile>
-                          <div className="flex flex-wrap gap-2">
-                            <Button asChild variant="outline" size="sm">
-                              <Link to={`/admin/exams/${exam.id}`}>
-                                {exam.status === "DRAFT" ? "Edit Draft" : "View Exam"}
-                              </Link>
-                            </Button>
-
-                            <Button asChild variant="outline" size="sm">
-                              <Link to={`/admin/exams/${exam.id}/results`}>
-                                <BarChart3 className="size-4" aria-hidden="true" />
-                                <span>Student Results</span>
-                              </Link>
-                            </Button>
-
-                            {exam.status === "DRAFT" ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:bg-destructive-subtle hover:text-destructive"
-                                onClick={() => setExamToDelete(exam)}
-                              >
-                                <Trash2 className="size-4" aria-hidden="true" />
-                                <span>Delete</span>
-                              </Button>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </ResponsiveTable>
-              )}
-            </section>
+              <b>No examinations match</b>
+              Try a different status or search term.
+            </div>
           )}
-        </>
+
+          <div className="admin-tf" id="cnt">
+            Showing {filteredExams.length} of {exams.length} examinations
+          </div>
+        </div>
       )}
 
       <ConfirmDialog
@@ -402,6 +550,25 @@ export function AdminDashboardPage() {
         isPending={isDeleting}
         onConfirm={() => void handleConfirmDelete()}
       />
-    </div>
+
+      <ConfirmDialog
+        open={examToClose !== null}
+        onOpenChange={(open) => {
+          if (!open && !isClosing) {
+            setExamToClose(null);
+          }
+        }}
+        title="Close examination?"
+        description={
+          examToClose
+            ? `Close "${examToClose.title}" so students can no longer start new attempts? Submitted attempts will remain available in results.`
+            : ""
+        }
+        confirmLabel="Close examination"
+        confirmVariant="destructive"
+        isPending={isClosing}
+        onConfirm={() => void handleConfirmClose()}
+      />
+    </section>
   );
 }

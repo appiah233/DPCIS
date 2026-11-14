@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -79,11 +80,11 @@ def require_identity(
     try:
         jwks_url, issuer = settings.require_neon_auth_config()
         signing_key = _jwks_client(jwks_url).get_signing_key_from_jwt(credentials.credentials)
-        decode_options: dict[str, object] = {
+        decode_options: dict[str, Any] = {
             "require": ["exp", "sub"],
             "verify_aud": bool(settings.NEON_AUTH_AUDIENCE),
         }
-        decode_kwargs: dict[str, object] = {
+        decode_kwargs: dict[str, Any] = {
             "algorithms": ["EdDSA"],
             "issuer": _managed_auth_issuer(issuer),
             "options": decode_options,

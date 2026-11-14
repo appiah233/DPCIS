@@ -12,10 +12,14 @@ export interface DialogProps {
   children?: ReactNode;
   footer?: ReactNode;
   closeOnBackdropClick?: boolean;
+  variant?: "modal" | "drawer";
   className?: string;
 }
 
-function isPointerOutsideDialog(event: PointerEvent<HTMLDialogElement>, dialog: HTMLDialogElement): boolean {
+function isPointerOutsideDialog(
+  event: PointerEvent<HTMLDialogElement>,
+  dialog: HTMLDialogElement,
+): boolean {
   const rect = dialog.getBoundingClientRect();
   return (
     event.clientX < rect.left ||
@@ -33,9 +37,11 @@ export function Dialog({
   children,
   footer,
   closeOnBackdropClick = true,
+  variant = "modal",
   className,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const pressedOutsideRef = useRef(false);
   const titleId = useId();
   const descriptionId = useId();
@@ -47,6 +53,8 @@ export function Dialog({
     }
 
     if (open && !dialog.open) {
+      triggerRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       dialog.showModal();
       const initialFocusTarget = dialog.querySelector<HTMLElement>(
         "[data-dialog-initial-focus]:not([disabled])",
@@ -54,6 +62,10 @@ export function Dialog({
       initialFocusTarget?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
+      if (triggerRef.current && document.contains(triggerRef.current)) {
+        triggerRef.current.focus();
+      }
+      triggerRef.current = null;
     }
   }, [open]);
 
@@ -66,6 +78,10 @@ export function Dialog({
     const handleClose = () => {
       dialog.returnValue = "";
       onOpenChange(false);
+      if (triggerRef.current && document.contains(triggerRef.current)) {
+        triggerRef.current.focus();
+      }
+      triggerRef.current = null;
     };
 
     const handleCancel = (event: Event) => {
@@ -110,12 +126,24 @@ export function Dialog({
       aria-describedby={description ? descriptionId : undefined}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      className={cn("exam-dialog", className)}
+      className={cn(
+        "exam-dialog",
+        variant === "drawer" && "exam-drawer",
+        className,
+      )}
     >
-      <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
-        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+      <div
+        className={cn(
+          "flex flex-col",
+          variant === "drawer" ? "h-dvh max-h-dvh" : "max-h-[calc(100dvh-2rem)]",
+        )}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
           <div className="min-w-0 space-y-1">
-            <h2 id={titleId} className="text-lg font-semibold leading-snug text-foreground">
+            <h2
+              id={titleId}
+              className="text-lg font-semibold leading-tight tracking-tight text-foreground"
+            >
               {title}
             </h2>
             {description ? (
@@ -137,13 +165,18 @@ export function Dialog({
         </div>
 
         {children ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-sm text-foreground sm:px-6">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label={title}
+            className="min-h-0 flex-1 overflow-y-auto px-5 py-5 text-sm text-foreground sm:px-6"
+          >
             {children}
           </div>
         ) : null}
 
         {footer ? (
-          <div className="flex flex-col-reverse gap-2.5 border-t border-border bg-muted/40 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+          <div className="flex flex-col-reverse gap-3 border-t border-border bg-card px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
             {footer}
           </div>
         ) : null}
@@ -198,6 +231,7 @@ export function ConfirmDialog({
           <Button
             type="button"
             variant={confirmVariant}
+            isLoading={isPending}
             disabled={isPending}
             onClick={onConfirm}
           >

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Result Page — Option A (Score Hero Summary + KPI Strip + Filterable Breakdown)</title>
+    <style>
+      :root {
+        --bg-canvas: #f7f8fa;
+        --bg-surface: #ffffff;
+        --bg-subtle: #f1f3f6;
+        --text-primary: #111827;
+        --text-secondary: #4b5563;
+        --text-muted: #6b7280;
+        --border-default: #e2e8f0;
+        --accent-primary: #b91c1c;
+        --success-bg: #f0fdf4;
+        --success-border: #86efac;
+        --success-text: #166534;
+        --danger-bg: #fef2f2;
+        --danger-border: #fca5a5;
+        --danger-text: #b91c1c;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg-canvas);
+        color: var(--text-primary);
+        line-height: 1.5;
+      }
+      .direction-banner {
+        background: #111827;
+        color: #f9fafb;
+        padding: 8px 24px;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .direction-banner strong { color: #fca5a5; }
+      .nav-bar {
+        height: 60px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border-default);
+        padding: 0 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .container {
+        max-width: 1080px;
+        margin: 28px auto 64px;
+        padding: 0 24px;
+      }
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 20px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent-primary);
+      }
+      h1 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .score-hero {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-bottom: 24px;
+        display: grid;
+        grid-template-columns: 1.4fr 2fr;
+        gap: 24px;
+        align-items: center;
+      }
+      .score-main {
+        padding-right: 24px;
+        border-right: 1px solid var(--border-default);
+      }
+      .outcome-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: var(--success-bg);
+        border: 1px solid var(--success-border);
+        color: var(--success-text);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .score-pct {
+        font-size: 44px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+        font-variant-numeric: tabular-nums;
+      }
+      .score-sub {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .kpi-box {
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        padding: 14px;
+      }
+      .kpi-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+      .kpi-val {
+        font-size: 20px;
+        font-weight: 700;
+        margin-top: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+      .filter-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .pills {
+        display: flex;
+        gap: 8px;
+      }
+      .pill {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border-default);
+        background: var(--bg-surface);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .pill.active {
+        background: #111827;
+        color: #fff;
+        border-color: #111827;
+      }
+      .review-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        padding: 20px 24px;
+        margin-bottom: 14px;
+      }
+      .review-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 14px;
+      }
+      .opt-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border-default);
+        margin-top: 8px;
+        font-size: 14px;
+      }
+      .opt-item.correct {
+        background: var(--success-bg);
+        border-color: var(--success-border);
+      }
+      .opt-item.wrong {
+        background: var(--danger-bg);
+        border-color: var(--danger-border);
+      }
+      .tag {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="direction-banner">
+      <span><strong>RESULT OPTION A — Score Hero Card + 4-KPI Strip + Filterable Breakdown</strong> (Canvas pattern)</span>
+      <span>Single stacked container (1080px max) · Print-ready linear flow</span>
+    </div>
+
+    <header class="nav-bar">
+      <div style="font-weight:700; font-size:15px;">Examination Hub · Student Workspace</div>
+      <div style="font-size:13px; color:#4b5563;">Ama Mensah (STUDENT)</div>
+    </header>
+
+    <main class="container">
+      <div class="page-header">
+        <div>
+          <div class="eyebrow">Official Examination Result</div>
+          <h1>Data Protection &amp; Cybersecurity Fundamentals</h1>
+        </div>
+        <button style="height:38px; padding:0 14px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; font-weight:600; font-size:13px;">
+          ← Back to Examinations
+        </button>
+      </div>
+
+      <section class="score-hero">
+        <div class="score-main">
+          <span class="outcome-pill">✓ PASSED</span>
+          <div class="score-pct">83.3%</div>
+          <div class="score-sub">Pass mark required: 70% · Submitted 14 Nov 2026, 02:34 UTC</div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-box">
+            <div class="kpi-label">Points Earned</div>
+            <div class="kpi-val">25 / 30</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Correct</div>
+            <div class="kpi-val" style="color:#166534;">17</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Incorrect</div>
+            <div class="kpi-val" style="color:#b91c1c;">3</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Unanswered</div>
+            <div class="kpi-val">0</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="filter-bar">
+        <h2 style="font-size:16px; font-weight:700;">Question-by-Question Review (20)</h2>
+        <div class="pills">
+          <span class="pill active">All (20)</span>
+          <span class="pill">Incorrect (3)</span>
+          <span class="pill">Correct (17)</span>
+        </div>
+      </div>
+
+      <article class="review-card">
+        <div class="review-head">
+          <div>
+            <div style="font-size:12px; font-weight:700; color:#6b7280;">QUESTION 2</div>
+            <div style="font-size:16px; font-weight:600; margin-top:2px;">
+              Under the principle of least privilege, how should role-based authorization be enforced?
+            </div>
+          </div>
+          <span class="tag" style="background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5;">✕ Incorrect · 0 / 1 pt</span>
+        </div>
+
+        <div class="opt-item wrong">
+          <span><strong>A.</strong> By trusting role flags stored in browser localStorage</span>
+          <span class="tag" style="background:#b91c1c; color:#fff;">Your answer</span>
+        </div>
+        <div class="opt-item correct">
+          <span><strong>B.</strong> On the backend API against verified server-side identity records</span>
+          <span class="tag" style="background:#166534; color:#fff;">✓ Correct answer</span>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>

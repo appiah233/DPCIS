@@ -19,6 +19,11 @@ export interface EditableOption {
 export interface EditableQuestion {
   localKey: string;
   question_text: string;
+  source_file_id?: string | null;
+  source_number?: number | null;
+  pdf_options_text?: Record<string, string>;
+  pdf_warnings?: string[];
+  pdf_confidence?: DecimalValue | null;
   points: string;
   options: EditableOption[];
   parserErrors?: string[];
@@ -141,7 +146,9 @@ export function formatDecimal(
   }
   const formatted = Number.isInteger(numeric)
     ? String(numeric)
-    : numeric.toFixed(2).replace(/\.?0+$/, "");
+    : suffix === "%"
+      ? numeric.toFixed(1).replace(/\.0$/, "")
+      : numeric.toFixed(2).replace(/\.?0+$/, "");
   return suffix ? `${formatted}${suffix}` : formatted;
 }
 
@@ -206,6 +213,11 @@ export function fromAdminQuestions(questions: QuestionAdminOut[]): EditableQuest
     return {
       localKey: createLocalQuestionKey(),
       question_text: question.question_text,
+      source_file_id: question.source_file_id,
+      source_number: question.source_number,
+      pdf_options_text: question.pdf_options_text,
+      pdf_warnings: question.pdf_warnings,
+      pdf_confidence: question.pdf_confidence,
       points: formatPointsForInput(question.points),
       options: relabelSequentialOptions(
         sortedOptions.map((option) => ({
@@ -236,6 +248,11 @@ export function fromParsedQuestion(parsed: ParsedQuestion): EditableQuestion {
   return {
     localKey: createLocalQuestionKey(),
     question_text: parsed.question_text,
+    source_file_id: parsed.source_file_id,
+    source_number: parsed.source_number,
+    pdf_options_text: parsed.pdf_options_text,
+    pdf_warnings: parsed.warnings,
+    pdf_confidence: parsed.pdf_confidence,
     points: formatPointsForInput(parsed.points),
     options: relabelSequentialOptions(mappedOptions),
     parserErrors: parsed.errors.length > 0 ? [...parsed.errors] : undefined,
@@ -337,6 +354,11 @@ export function toQuestionCreates(questions: EditableQuestion[]): QuestionCreate
 
     return {
       question_text: question.question_text.trim(),
+      source_file_id: question.source_file_id,
+      source_number: question.source_number,
+      pdf_options_text: question.pdf_options_text,
+      pdf_warnings: question.pdf_warnings,
+      pdf_confidence: question.pdf_confidence,
       position: index,
       points: Number.parseFloat(question.points).toFixed(2),
       options,
@@ -348,6 +370,11 @@ export function computeQuestionsSignature(questions: EditableQuestion[]): string
   return JSON.stringify(
     questions.map((question) => ({
       question_text: question.question_text.trim(),
+      source_file_id: question.source_file_id,
+      source_number: question.source_number,
+      pdf_options_text: question.pdf_options_text,
+      pdf_warnings: question.pdf_warnings,
+      pdf_confidence: question.pdf_confidence,
       points: question.points.trim(),
       options: relabelSequentialOptions(question.options).map((option) => ({
         label: option.label,

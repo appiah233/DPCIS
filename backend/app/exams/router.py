@@ -2,21 +2,64 @@
 
 from __future__ import annotations
 
-from uuid import UUID
+import hashlib
+import json
+import re
+from collections.abc import Iterable
+from decimal import Decimal
+from typing import Any, cast
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import Response as BinaryResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthIdentity, require_admin, require_student
 from app.database.session import get_db
+from app.exams import models as exam_models
 from app.exams import service
+from app.exams.parser import ANSWER_KEY_ENTRY, ANSWER_KEY_ROW
+from app.exams.pdf_import import (
+    MAX_PDF_BYTES,
+    OCRUnavailable,
+    detect_pdf_questions,
+    detect_questions_with_ocr,
+    validate_pdf,
+)
+from app.exams.pdf_storage import (
+    load_image,
+    load_regions,
+    regenerate_crops,
+    source_dir,
+    store_answer_key_pdf,
+    store_pdf,
+)
 from app.exams.schemas import (
+    VALID_OPTION_LABELS,
+    CropRegionInput,
+    CropUpdateRequest,
+    CropUpdateResponse,
     ExamAdminOut,
     ExamCreate,
     ExamStatus,
     ExamStudentOut,
     ExamUpdate,
     ExamWithQuestionsAdmin,
+    OptionLabel,
+    ParsedOption,
+    ParsedQuestion,
+    ParseQuestionsError,
     ParseQuestionsRequest,
     ParseQuestionsResponse,
     QuestionAdminOut,
@@ -79,6 +122,248 @@ def parse_questions_route(
     return service.parse_questions_service(data.raw_text, data.answer_key_text)
 
 
+@admin_router.post("/{exam_id}/import-pdf", response_model=ParseQuestionsResponse)
+async def import_pdf_route(
+    exam_id: UUID,
+    file: UploadFile = File(...),
+    answer_key_text: str = Form(default=""),
+    answer_file: UploadFile | None = File(default=None),
+    identity: AuthIdentity = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ParseQuestionsResponse:
+    service.require_admin_user_id(identity)
+    exam = db.get(exam_models.Exam, exam_id)
+    if exam is None or exam.status != "DRAFT":
+        raise HTTPException(status_code=404, detail="Draft examination not found")
+    data = await file.read(MAX_PDF_BYTES + 1)
+    try:
+        doc = validate_pdf(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        detected = detect_pdf_questions(doc)
+        ocr_used = len(detected) < 2
+        if ocr_used:
+            try:
+                detected = detect_questions_with_ocr(doc)
+            except OCRUnavailable as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+        page_count = len(doc)
+        page_dimensions = [(float(page.rect.width), float(page.rect.height)) for page in doc]
+    finally:
+        doc.close()
+    if not detected:
+        raise HTTPException(status_code=422, detail="No numbered questions were detected")
+    answer_data: bytes | None = None
+    if answer_file is not None:
+        answer_data = await answer_file.read(MAX_PDF_BYTES + 1)
+        try:
+            answer_doc = validate_pdf(answer_data)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            answer_key_text = "\n".join(
+                str(page.get_text("text")) for page in cast(Iterable[Any], answer_doc)
+            )
+        finally:
+            answer_doc.close()
+        if not answer_key_text.strip():
+            raise HTTPException(status_code=422, detail="Answer PDF contains no selectable text")
+    digest = hashlib.sha256(data).hexdigest()
+    existing = db.scalars(
+        select(exam_models.ExamSourceFile)
+        .where(exam_models.ExamSourceFile.exam_id == exam_id)
+        .where(exam_models.ExamSourceFile.sha256 == digest)
+        .order_by(exam_models.ExamSourceFile.uploaded_at.desc())
+    ).first()
+    if existing is None:
+        source_id = uuid4()
+        try:
+            store_pdf(source_id, data, detected)
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail="PDF storage is unavailable") from exc
+        db.add(exam_models.ExamSourceFile(
+            id=source_id,
+            exam_id=exam_id,
+            original_filename=(file.filename or "uploaded.pdf")[:255],
+            sha256=digest,
+            page_count=page_count,
+        ))
+        db.commit()
+    else:
+        source_id = existing.id
+        if not source_dir(source_id).is_dir():
+            try:
+                store_pdf(source_id, data, detected)
+            except OSError as exc:
+                raise HTTPException(status_code=500, detail="PDF storage is unavailable") from exc
+    key: dict[int, tuple[str, Decimal]] = {}
+    compact = re.sub(r"\s+", "", answer_key_text)
+    if compact and re.fullmatch(r"[A-Da-d]+", compact):
+        key = {i: (letter.upper(), Decimal(1)) for i, letter in enumerate(compact, 1)}
+    else:
+        lines = [line.strip() for line in answer_key_text.splitlines() if line.strip()]
+        for i in range(len(lines) - 2):
+            if (
+                re.fullmatch(r"\d+", lines[i])
+                and re.fullmatch(r"[A-Da-d]", lines[i + 1])
+                and re.fullmatch(r"\d+", lines[i + 2])
+            ):
+                key[int(lines[i])] = (lines[i + 1].upper(), Decimal(lines[i + 2]))
+        for line in answer_key_text.splitlines():
+            row = ANSWER_KEY_ROW.fullmatch(line)
+            for match in ANSWER_KEY_ENTRY.finditer(line):
+                if match.group(2).upper() in "ABCD":
+                    key[int(match.group(1))] = (
+                        match.group(2).upper(),
+                        Decimal(row.group(3)) if row and row.group(3) else Decimal(1),
+                    )
+    mismatch = bool(answer_key_text.strip()) and (
+        len(key) != len(detected) or set(key) != {question.number for question in detected}
+    )
+    if answer_data is not None and not mismatch:
+        try:
+            store_answer_key_pdf(source_id, answer_data)
+        except OSError as exc:
+            raise HTTPException(
+                status_code=500, detail="Answer PDF storage is unavailable"
+            ) from exc
+    items: list[ParsedQuestion] = []
+    for question in detected:
+        answer = key.get(question.number)
+        warnings = list(question.warnings)
+        if answer is None:
+            warnings.append("No answer in the key; select one before saving.")
+        try:
+            regions = load_regions(source_id, question.number)
+        except (OSError, ValueError):
+            regions = [
+                {"page": region.page, "bbox": list(region.bbox)} for region in question.regions
+            ]
+        items.append(
+            ParsedQuestion(
+                position=question.number,
+                question_text=question.extracted_text or f"Question {question.number}",
+                source_file_id=source_id,
+                source_number=question.number,
+                image_urls=[
+                    f"/api/admin/exams/{exam_id}/source-images/{source_id}/{question.number}/{i}"
+                    for i in range(len(regions))
+                ],
+                image_regions=regions,
+                options=[
+                    ParsedOption(label=letter, option_text=f"Option {letter} (see image)")
+                    for letter in VALID_OPTION_LABELS
+                ],
+                answer_label=cast(OptionLabel, answer[0]) if answer else None,
+                points=answer[1] if answer else Decimal(1),
+                valid=answer is not None and not mismatch,
+                warnings=warnings,
+                pdf_options_text=question.options_text,
+                pdf_confidence=(
+                    Decimal("0.50")
+                    if ocr_used
+                    else Decimal("1.00")
+                    if len(question.options_text) == 4
+                    else Decimal("0.75")
+                ),
+            )
+        )
+    return ParseQuestionsResponse(
+        valid_questions=[q for q in items if q.valid],
+        invalid_questions=[q for q in items if not q.valid],
+        total_blocks=len(items),
+        valid_count=sum(q.valid for q in items),
+        errors=(
+            [
+                ParseQuestionsError(
+                    block_index=0,
+                    message=(
+                        f"Answer key has {len(key)} answers but {len(detected)} "
+                        "questions were detected"
+                    ),
+                )
+            ]
+            if mismatch
+            else []
+        ),
+        error_count=1 if mismatch else 0,
+        normalized_answer_key=", ".join(f"{n}. {v[0]}" for n, v in sorted(key.items())),
+        page_dimensions=page_dimensions,
+        ocr_used=ocr_used,
+    )
+
+
+@admin_router.get("/{exam_id}/source-images/{source_id}/{number}/{index}")
+def admin_source_image_route(
+    exam_id: UUID,
+    source_id: UUID,
+    number: int,
+    index: int,
+    identity: AuthIdentity = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> BinaryResponse:
+    service.require_admin_user_id(identity)
+    source = db.get(exam_models.ExamSourceFile, source_id)
+    if source is not None and source.exam_id != exam_id:
+        source = None
+    if source is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    try:
+        image = load_image(source.id, number, index)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="Image not found") from exc
+    return BinaryResponse(content=image, media_type="image/png")
+
+
+@admin_router.put(
+    "/{exam_id}/sources/{source_id}/questions/{number}/crops",
+    response_model=CropUpdateResponse,
+)
+def update_question_crops_route(
+    exam_id: UUID,
+    source_id: UUID,
+    number: int,
+    payload: CropUpdateRequest,
+    identity: AuthIdentity = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> CropUpdateResponse:
+    service.require_admin_user_id(identity)
+    exam = db.get(exam_models.Exam, exam_id)
+    source = db.get(exam_models.ExamSourceFile, source_id)
+    if exam is None or exam.status != "DRAFT" or source is None or source.exam_id != exam_id:
+        raise HTTPException(status_code=404, detail="Draft PDF source not found")
+    try:
+        regions = regenerate_crops(
+            source_id,
+            number,
+            [region.model_dump() for region in payload.regions],
+            dpi=payload.dpi,
+            padding=payload.padding,
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    questions = (
+        db.query(exam_models.Question)
+        .filter_by(exam_id=exam_id, source_file_id=source_id, source_number=number)
+        .all()
+    )
+    for question in questions:
+        question.image_regions = json.dumps(regions)
+        question.image_paths = json.dumps(
+            [f"{number}-{index}.png" for index in range(len(regions))]
+        )
+    db.commit()
+    version = uuid4().hex
+    return CropUpdateResponse(
+        regions=[CropRegionInput.model_validate(r) for r in regions],
+        image_urls=[
+            f"/api/admin/exams/{exam_id}/source-images/{source_id}/{number}/{index}?v={version}"
+            for index in range(len(regions))
+        ],
+    )
+
+
 @admin_router.get(
     "/{exam_id}",
     response_model=ExamWithQuestionsAdmin,
@@ -128,9 +413,7 @@ def save_questions_route(
     identity: AuthIdentity = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> ExamWithQuestionsAdmin:
-    questions = (
-        payload.questions if isinstance(payload, SaveQuestionsRequest) else payload
-    )
+    questions = payload.questions if isinstance(payload, SaveQuestionsRequest) else payload
     return service.save_questions(db, exam_id, identity, questions)
 
 

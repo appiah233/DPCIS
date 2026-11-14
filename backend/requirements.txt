@@ -3,6 +3,8 @@ alembic==1.20.1
 fastapi==0.162.4
 PyJWT[crypto]==2.10.1
 psycopg[binary]==3.3.8
+PyMuPDF==1.26.5
+python-multipart==0.0.20
 pydantic==2.14.3
 pydantic-settings==2.16.2
 sqlalchemy==2.1.8

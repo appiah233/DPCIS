@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
@@ -89,7 +89,7 @@ def _get_users_table() -> Table:
         from app.users.models import ApplicationUser
     except ImportError:
         return _FALLBACK_APPLICATION_USERS_TABLE
-    return ApplicationUser.__table__
+    return cast(Table, ApplicationUser.__table__)
 
 
 def _normalize_subject(auth_subject: str) -> str:

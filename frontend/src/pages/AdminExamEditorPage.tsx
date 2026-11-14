@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { ErrorStatePanel, LoadingStatePanel } from "@/components/ui/state-panel";
+import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   closeAdminExam,
   deleteAdminExam,
@@ -28,6 +29,7 @@ import {
   extractAdminApiError,
   formatDateTime,
   fromAdminQuestions,
+  hasAnyQuestionValidationIssues,
   toQuestionCreates,
   type EditableQuestion,
 } from "@/features/admin/adminUtils";
@@ -35,6 +37,7 @@ import { BulkParserPanel } from "@/features/admin/components/BulkParserPanel";
 import { ExamSettingsForm } from "@/features/admin/components/ExamSettingsForm";
 import { ExamStatusBadge } from "@/features/admin/components/ExamStatusBadge";
 import { QuestionListEditor } from "@/features/admin/components/QuestionListEditor";
+import { uniqueIncomingPdfQuestions } from "@/features/admin/importDedup";
 import type { ExamCreate, ExamWithQuestionsAdmin } from "@/types/adminExam";
 
 export function AdminExamEditorPage() {
@@ -148,12 +151,19 @@ export function AdminExamEditorPage() {
     setQuestionsError(null);
     setQuestionsSuccess(null);
     setLifecycleError(null);
-    setQuestions((prev) => (mode === "replace" ? incoming : [...prev, ...incoming]));
+    setQuestions((prev) => {
+      if (mode === "replace") return incoming;
+      return [...prev, ...uniqueIncomingPdfQuestions(prev, incoming)];
+    });
   };
 
-  const handleSaveQuestions = async () => {
+  const persistQuestionList = async (
+    nextQuestions: EditableQuestion[],
+    advanceToSettings: boolean,
+  ): Promise<string | null> => {
+    if (isSavingQuestions) return "A question save is already in progress.";
     if (!exam || exam.status !== "DRAFT") {
-      return;
+      return "Only draft examinations can be edited.";
     }
     setIsSavingQuestions(true);
     setQuestionsError(null);
@@ -161,7 +171,7 @@ export function AdminExamEditorPage() {
     setLifecycleError(null);
 
     try {
-      const payload = toQuestionCreates(questions);
+      const payload = toQuestionCreates(nextQuestions);
       const updated = await saveExamQuestions(exam.id, payload);
       setExam(updated);
       const mapped = fromAdminQuestions(updated.questions);
@@ -170,13 +180,32 @@ export function AdminExamEditorPage() {
       setQuestionsSuccess(
         `Saved ${updated.questions.length} question${updated.questions.length === 1 ? "" : "s"}.`,
       );
+      if (advanceToSettings) {
+        setSettingsSuccess("Questions and answers saved. Review settings before publishing.");
+        setActiveSection("settings");
+      }
+      return null;
     } catch (error) {
-      setQuestionsError(
-        extractAdminApiError(error, "Unable to save questions.").message,
-      );
+      const message = extractAdminApiError(error, "Unable to save questions.").message;
+      setQuestionsError(message);
+      return message;
     } finally {
       setIsSavingQuestions(false);
     }
+  };
+
+  const handleSaveQuestions = async () => {
+    await persistQuestionList(questions, false);
+  };
+
+  const handleSaveImportedQuestions = async (
+    incoming: EditableQuestion[],
+  ): Promise<string | null> => {
+    const merged = [...questions, ...uniqueIncomingPdfQuestions(questions, incoming)];
+    if (merged.length === 0 || hasAnyQuestionValidationIssues(merged)) {
+      return "Review the questions below: each needs valid text, options, points, and one correct answer before saving.";
+    }
+    return persistQuestionList(merged, true);
   };
 
   const handleDiscardQuestions = () => {
@@ -409,22 +438,22 @@ export function AdminExamEditorPage() {
         </Alert>
       ) : null}
 
-      <nav aria-label="Examination editor sections" className="flex flex-wrap gap-2 border-b border-border pb-3">
-        {(["overview", "questions", "settings"] as const).map((section) => (
-          <Button
-            key={section}
-            type="button"
-            variant={activeSection === section ? "default" : "ghost"}
-            aria-current={activeSection === section ? "page" : undefined}
-            onClick={() => setActiveSection(section)}
-          >
-            {section === "overview" ? "Overview" : section === "questions" ? `Questions (${questions.length})` : "Settings"}
-          </Button>
-        ))}
-        <Button asChild variant="ghost">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+        <TabsList ariaLabel="Examination editor sections" className="w-auto border-b-0 pb-0">
+          {(["overview", "questions", "settings"] as const).map((section) => (
+            <TabsTrigger
+              key={section}
+              active={activeSection === section}
+              onClick={() => setActiveSection(section)}
+            >
+              {section === "overview" ? "Overview" : section === "questions" ? `Questions (${questions.length})` : "Settings"}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <Button asChild variant="ghost" size="sm">
           <Link to={`/admin/exams/${exam.id}/results`}>Results</Link>
         </Button>
-      </nav>
+      </div>
 
       {activeSection === "overview" ? (
         <section aria-label="Examination overview" className="grid gap-4 rounded-lg border border-border bg-card p-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -453,9 +482,12 @@ export function AdminExamEditorPage() {
       <div hidden={activeSection !== "questions"} className="space-y-6">
       {!isReadOnly ? (
         <BulkParserPanel
-          disabled={isReadOnly}
+          examId={exam.id}
+          disabled={isReadOnly || isSavingQuestions}
           existingQuestionCount={questions.length}
+          existingQuestions={questions}
           onApplyQuestions={handleApplyParsedQuestions}
+          onSaveImportedQuestions={handleSaveImportedQuestions}
         />
       ) : null}
 

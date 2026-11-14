@@ -1,10 +1,10 @@
 import {
   ArrowLeft,
-  ArrowRight,
   Clock,
+  Flag,
   Info,
   Lock,
-  ShieldCheck,
+  Save,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -17,7 +17,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -54,6 +53,7 @@ export function StudentExamInstructionsPage() {
   const [reloadNonce, setReloadNonce] = useState(0);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [rulesAcknowledged, setRulesAcknowledged] = useState(false);
   const startingLockRef = useRef(false);
 
   const handleRetry = useCallback(() => {
@@ -188,7 +188,7 @@ export function StudentExamInstructionsPage() {
   const attemptsRemaining = Math.max(0, exam.max_attempts - exam.attempts_used);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <PageHeader
         eyebrow="Examination Briefing"
         title={exam.title}
@@ -214,10 +214,10 @@ export function StudentExamInstructionsPage() {
         />
       ) : null}
 
-      <Card>
+      <div className="student-instructions-grid"><Card>
         <CardHeader className="gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle as="h2">Examination Summary</CardTitle>
+            <CardTitle as="h2">Examination rules</CardTitle>
             {hasActiveAttempt ? (
               <Badge variant="accent">
                 <Clock className="size-3.5" aria-hidden="true" />
@@ -235,81 +235,26 @@ export function StudentExamInstructionsPage() {
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          <dl className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:grid-cols-2">
-            <div className="min-w-0">
-              <dt className="text-xs font-medium text-muted-foreground">Duration</dt>
-              <dd className="mt-0.5 text-base font-semibold tabular-nums text-foreground">
-                {formatDurationMinutes(exam.duration_minutes)}
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-xs font-medium text-muted-foreground">Questions</dt>
-              <dd className="mt-0.5 text-base font-semibold tabular-nums text-foreground">
-                {exam.question_count} multiple-choice{" "}
-                {exam.question_count === 1 ? "question" : "questions"}
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-xs font-medium text-muted-foreground">Pass mark</dt>
-              <dd className="mt-0.5 text-base font-semibold tabular-nums text-foreground">
-                {formatDecimalValue(exam.pass_mark)}%
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-xs font-medium text-muted-foreground">Attempts</dt>
-              <dd className="mt-0.5 text-base font-semibold tabular-nums text-foreground">
-                {exam.attempts_used} used of {exam.max_attempts} ({attemptsRemaining}{" "}
-                remaining)
-              </dd>
-            </div>
-          </dl>
-
-          <section aria-labelledby="instructions-content-heading" className="space-y-2">
+        <CardContent className="!p-0">
+          <ul className="student-rules">
+            <li><span className="student-kpi-icon"><Clock className="size-4" /></span><div><b>The timer can’t be paused</b><span>You have {formatDurationMinutes(exam.duration_minutes)}. When time runs out, your saved answers are submitted automatically.</span></div></li>
+            <li><span className="student-kpi-icon"><Save className="size-4" /></span><div><b>Answers save automatically</b><span>A Saved badge confirms each change. Keep this page open and stay online while taking the examination.</span></div></li>
+            <li><span className="student-kpi-icon"><Flag className="size-4" /></span><div><b>Move between questions</b><span>Use the question map to return to questions before submitting.</span></div></li>
+            <li><span className="student-kpi-icon"><Lock className="size-4" /></span><div><b>Attempts are limited</b><span>You have {attemptsRemaining} {attemptsRemaining === 1 ? "attempt" : "attempts"} remaining.</span></div></li>
+            <li><span className="student-kpi-icon"><Info className="size-4" /></span><div><b>Work on your own</b><span>Do not share questions or answers.</span></div></li>
+          </ul>
+          {exam.instructions ? <section aria-labelledby="instructions-content-heading" className="space-y-2 border-t border-border p-5">
             <h3
               id="instructions-content-heading"
               className="text-base font-semibold text-foreground"
             >
               Instructions
             </h3>
-            {exam.instructions ? (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground sm:text-base">
-                {exam.instructions}
-              </p>
-            ) : (
-              <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-                Select one option for each question. You can move freely between questions and
-                review all responses before submitting.
-              </p>
-            )}
-          </section>
-
-          <Alert variant="default">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
-              <div className="space-y-1">
-                <AlertTitle>Timed session &amp; automatic save</AlertTitle>
-                <AlertDescription>
-                  <ul className="mt-1 list-disc space-y-1 pl-4">
-                    <li>
-                      Your answers are saved automatically as soon as you select an option.
-                    </li>
-                    <li>
-                      Refreshing or reopening the browser restores your saved answers, while your
-                      exam timer continues uninterrupted.
-                    </li>
-                    <li>
-                      When time reaches zero, your recorded answers are locked and submitted
-                      automatically.
-                    </li>
-                  </ul>
-                </AlertDescription>
-              </div>
-            </div>
-          </Alert>
+            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground sm:text-base">{exam.instructions}</p>
+          </section> : null}
 
           {!exam.show_result ? (
-            <Alert variant="default">
+            <Alert variant="default" className="m-5">
               <div className="flex items-start gap-3">
                 <Info className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div>
@@ -324,37 +269,13 @@ export function StudentExamInstructionsPage() {
           ) : null}
         </CardContent>
 
-        <CardFooter className="justify-between">
-          {isStarting ? (
-            <Button type="button" variant="outline" disabled>
-              Cancel
-            </Button>
-          ) : (
-            <Button asChild variant="outline">
-              <Link to="/student">Cancel</Link>
-            </Button>
-          )}
-
-          <Button
-            type="button"
-            variant="default"
-            size="lg"
-            disabled={isStarting || !exam.can_start}
-            onClick={() => void handleStartOrResume()}
-          >
-            <span>
-              {isStarting
-                ? hasActiveAttempt
-                  ? "Resuming..."
-                  : "Starting..."
-                : hasActiveAttempt
-                  ? "Resume Examination"
-                  : "Start Examination"}
-            </span>
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Button>
-        </CardFooter>
-      </Card>
+        {!hasActiveAttempt ? <label className="student-ack"><input type="checkbox" checked={rulesAcknowledged} onChange={(event) => setRulesAcknowledged(event.target.checked)} />I have read the rules and I’m ready to begin.</label> : null}
+      </Card><aside className="student-card student-details"><div className="student-card-heading"><h2>Examination details</h2></div><dl>
+        <div className="student-detail-row"><dt>Duration</dt><dd>{formatDurationMinutes(exam.duration_minutes)}</dd></div>
+        <div className="student-detail-row"><dt>Questions</dt><dd>{exam.question_count}</dd></div>
+        <div className="student-detail-row"><dt>Pass mark</dt><dd>{formatDecimalValue(exam.pass_mark)}%</dd></div>
+        <div className="student-detail-row"><dt>Attempts used</dt><dd>{exam.attempts_used} of {exam.max_attempts}</dd></div>
+      </dl><div className="p-5"><Button className="w-full" size="lg" disabled={isStarting || !exam.can_start || (!hasActiveAttempt && !rulesAcknowledged)} onClick={() => void handleStartOrResume()}>{isStarting ? "Opening examination…" : hasActiveAttempt ? "Resume examination" : "Start examination"}</Button>{!hasActiveAttempt && !rulesAcknowledged ? <p className="mt-2 text-xs text-muted-foreground">Tick the box to enable Start.</p> : null}</div></aside></div>
     </div>
   );
 }

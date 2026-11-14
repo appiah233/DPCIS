@@ -1,0 +1,599 @@
+{
+  "mode": "after",
+  "capturedAt": "2026-11-14T10:25:26.753Z",
+  "routesCount": 12,
+  "screenshots": [
+    "public__root__ready__1440w.png",
+    "public__root__ready__1024w.png",
+    "public__root__ready__768w.png",
+    "public__root__ready__390w.png",
+    "public__root__ready__360w.png",
+    "public__root__loading__1440w.png",
+    "public__root__empty__1440w.png",
+    "public__root__error__1440w.png",
+    "public__root__signup__1440w.png",
+    "student__student__ready__1440w.png",
+    "student__student__ready__1024w.png",
+    "student__student__ready__768w.png",
+    "student__student__ready__390w.png",
+    "student__student__loading__1440w.png",
+    "student__student__empty__1440w.png",
+    "student__student__error__1440w.png",
+    "student__student-exams-examId__ready__1440w.png",
+    "student__student-exams-examId__ready__1024w.png",
+    "student__student-exams-examId__ready__768w.png",
+    "student__student-exams-examId__ready__390w.png",
+    "student__student-exams-examId__loading__1440w.png",
+    "student__student-exams-examId__empty__1440w.png",
+    "student__student-exams-examId__error__1440w.png",
+    "student__student-attempts-attemptId__ready__1440w.png",
+    "student__student-attempts-attemptId__ready__1024w.png",
+    "student__student-attempts-attemptId__ready__768w.png",
+    "student__student-attempts-attemptId__ready__390w.png",
+    "student__student-attempts-attemptId__ready__360w.png",
+    "student__student-attempts-attemptId__loading__1440w.png",
+    "student__student-attempts-attemptId__empty__1440w.png",
+    "student__student-attempts-attemptId__error__1440w.png",
+    "student__student-attempts-attemptId__text-question__1440w.png",
+    "student__student-attempts-attemptId__pdf-image-question__1440w.png",
+    "student__student-attempts-attemptId__dialog-navigator__1440w.png",
+    "student__student-attempts-attemptId__dialog-submit__1440w.png",
+    "student__student-attempts-attemptId__time-expired__1440w.png",
+    "student__student-results-attemptId__ready__1440w.png",
+    "student__student-results-attemptId__ready__1024w.png",
+    "student__student-results-attemptId__ready__768w.png",
+    "student__student-results-attemptId__ready__390w.png",
+    "student__student-results-attemptId__ready__360w.png",
+    "student__student-results-attemptId__loading__1440w.png",
+    "student__student-results-attemptId__empty__1440w.png",
+    "student__student-results-attemptId__error__1440w.png",
+    "student__student-results-attemptId__failed-result__1440w.png",
+    "student__student-results-attemptId__review-disabled__1440w.png",
+    "student__student-results-attemptId__score-hidden__1440w.png",
+    "student__student-results-attemptId__in-progress-409__1440w.png",
+    "student__student-results-attemptId__time-expired-result__1440w.png",
+    "admin__admin__ready__1440w.png",
+    "admin__admin__ready__1024w.png",
+    "admin__admin__ready__768w.png",
+    "admin__admin__ready__390w.png",
+    "admin__admin__loading__1440w.png",
+    "admin__admin__empty__1440w.png",
+    "admin__admin__error__1440w.png",
+    "admin__admin-exams__ready__1440w.png",
+    "admin__admin-exams__ready__1024w.png",
+    "admin__admin-exams__ready__768w.png",
+    "admin__admin-exams__ready__390w.png",
+    "admin__admin-exams__ready__360w.png",
+    "admin__admin-exams__loading__1440w.png",
+    "admin__admin-exams__empty__1440w.png",
+    "admin__admin-exams__error__1440w.png",
+    "admin__admin-results__ready__1440w.png",
+    "admin__admin-results__ready__1024w.png",
+    "admin__admin-results__ready__768w.png",
+    "admin__admin-results__ready__390w.png",
+    "admin__admin-results__loading__1440w.png",
+    "admin__admin-results__empty__1440w.png",
+    "admin__admin-results__error__1440w.png",
+    "admin__admin-exams-new__ready__1440w.png",
+    "admin__admin-exams-new__ready__1024w.png",
+    "admin__admin-exams-new__ready__768w.png",
+    "admin__admin-exams-new__ready__390w.png",
+    "admin__admin-exams-new__loading__1440w.png",
+    "admin__admin-exams-new__empty__1440w.png",
+    "admin__admin-exams-new__error__1440w.png",
+    "admin__admin-exams-examId__ready__1440w.png",
+    "admin__admin-exams-examId__ready__1024w.png",
+    "admin__admin-exams-examId__ready__768w.png",
+    "admin__admin-exams-examId__ready__390w.png",
+    "admin__admin-exams-examId__loading__1440w.png",
+    "admin__admin-exams-examId__empty__1440w.png",
+    "admin__admin-exams-examId__error__1440w.png",
+    "admin__admin-exams-examId__tab-questions__1440w.png",
+    "admin__admin-exams-examId__published-locked__1440w.png",
+    "admin__admin-exams-examId__closed-locked__1440w.png",
+    "admin__admin-exams-examId-results__ready__1440w.png",
+    "admin__admin-exams-examId-results__ready__1024w.png",
+    "admin__admin-exams-examId-results__ready__768w.png",
+    "admin__admin-exams-examId-results__ready__390w.png",
+    "admin__admin-exams-examId-results__loading__1440w.png",
+    "admin__admin-exams-examId-results__empty__1440w.png",
+    "admin__admin-exams-examId-results__error__1440w.png",
+    "admin__admin-exams-examId-results__dialog-attempt-detail__1440w.png",
+    "public__404-not-found__ready__1440w.png",
+    "public__404-not-found__ready__1024w.png",
+    "public__404-not-found__ready__768w.png",
+    "public__404-not-found__ready__390w.png",
+    "public__404-not-found__error__1440w.png"
+  ],
+  "overflowFailures": [],
+  "consoleErrors": [],
+  "axeAudit": [
+    {
+      "route": "/",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/",
+      "state": "signup",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/exams/:examId",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/exams/:examId",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/exams/:examId",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/exams/:examId",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "pdf-image-question",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "dialog-navigator",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "dialog-submit",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/attempts/:attemptId",
+      "state": "time-expired",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "failed-result",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "review-disabled",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "score-hidden",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "in-progress-409",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/student/results/:attemptId",
+      "state": "time-expired-result",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/results",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/results",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/results",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/results",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/new",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/new",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/new",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/new",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId",
+      "state": "tab-questions",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId",
+      "state": "published-locked",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId",
+      "state": "closed-locked",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId/results",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId/results",
+      "state": "loading",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId/results",
+      "state": "empty",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId/results",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/admin/exams/:examId/results",
+      "state": "dialog-attempt-detail",
+      "seriousCount": 1,
+      "criticalCount": 0,
+      "totalViolations": 1,
+      "violations": [
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "description": "Ensure elements that have scrollable content are accessible by keyboard in Safari",
+          "nodes": 1
+        }
+      ]
+    },
+    {
+      "route": "/404-not-found",
+      "state": "ready",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    },
+    {
+      "route": "/404-not-found",
+      "state": "error",
+      "seriousCount": 0,
+      "criticalCount": 0,
+      "totalViolations": 0,
+      "violations": []
+    }
+  ]
+}

@@ -6,9 +6,11 @@ import time
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
+import fitz
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -108,7 +110,7 @@ def _sample_question_payload(
 
 
 @pytest.fixture
-def exam_env(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+def exam_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[SimpleNamespace]:
     private_key = Ed25519PrivateKey.generate()
     public_key = private_key.public_key()
     monkeypatch.setattr(
@@ -234,6 +236,213 @@ def _create_draft_exam(
     )
     assert resp.status_code == 201
     return resp.json()
+
+
+def test_pdf_upload_preview_and_private_image_delivery(
+    exam_env: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("EXAM_PDF_STORAGE_DIR", str(tmp_path))
+    exam = _create_draft_exam(exam_env)
+    fixture_dir = Path(__file__).parent / "fixtures"
+    with fitz.open(fixture_dir / "atomic_structure_ms.pdf") as doc:
+        key_text = doc[0].get_text()
+    upload = exam_env.client.post(
+        f"/api/admin/exams/{exam['id']}/import-pdf",
+        headers=exam_env.admin_headers,
+        files={
+            "file": (
+                "paper.pdf",
+                (fixture_dir / "atomic_structure_qp.pdf").read_bytes(),
+                "application/pdf",
+            ),
+            "answer_file": (
+                "mark-scheme.pdf",
+                (fixture_dir / "atomic_structure_ms.pdf").read_bytes(),
+                "application/pdf",
+            ),
+        },
+        data={"answer_key_text": key_text},
+    )
+    assert upload.status_code == 200, upload.text
+    preview = upload.json()
+    assert preview["valid_count"] == 24
+    assert preview["valid_questions"][0]["answer_label"] == "B"
+    source_id = preview["valid_questions"][0]["source_file_id"]
+    assert (tmp_path / source_id / "answer-key.pdf").read_bytes() == (
+        fixture_dir / "atomic_structure_ms.pdf"
+    ).read_bytes()
+    repeated = exam_env.client.post(
+        f"/api/admin/exams/{exam['id']}/import-pdf",
+        headers=exam_env.admin_headers,
+        files={
+            "file": (
+                "same-paper.pdf",
+                (fixture_dir / "atomic_structure_qp.pdf").read_bytes(),
+                "application/pdf",
+            )
+        },
+        data={"answer_key_text": key_text},
+    )
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["valid_count"] == 24
+    assert (
+        repeated.json()["valid_questions"][0]["source_file_id"]
+        == preview["valid_questions"][0]["source_file_id"]
+    )
+    image_url = preview["valid_questions"][3]["image_urls"][0]
+    assert exam_env.client.get(image_url, headers=exam_env.student_headers).status_code == 403
+    image = exam_env.client.get(image_url, headers=exam_env.admin_headers)
+    assert image.status_code == 200
+    assert image.content.startswith(b"\x89PNG")
+    source_id = preview["valid_questions"][3]["source_file_id"]
+    crop_path = f"/api/admin/exams/{exam['id']}/sources/{source_id}/questions/4/crops"
+    invalid_crop = exam_env.client.put(
+        crop_path,
+        headers=exam_env.admin_headers,
+        json={"regions": [{"page": 2, "bbox": [0, 100, 595, 110]}]},
+    )
+    assert invalid_crop.status_code == 422
+    assert exam_env.client.get(image_url, headers=exam_env.admin_headers).content == image.content
+    other_exam = _create_draft_exam(exam_env, title="Unrelated draft")
+    wrong_owner = exam_env.client.put(
+        crop_path.replace(exam["id"], other_exam["id"]),
+        headers=exam_env.admin_headers,
+        json={"regions": [{"page": 2, "bbox": [0, 90, 595, 220]}]},
+    )
+    assert wrong_owner.status_code == 404
+    edited_crop = exam_env.client.put(
+        crop_path,
+        headers=exam_env.admin_headers,
+        json={"regions": [{"page": 2, "bbox": [0, 90, 595, 220]}]},
+    )
+    assert edited_crop.status_code == 200, edited_crop.text
+    assert edited_crop.json()["regions"][0]["bbox"][1] == 90
+    assert (
+        exam_env.client.get(
+            edited_crop.json()["image_urls"][0], headers=exam_env.admin_headers
+        ).status_code
+        == 200
+    )
+    questions = [
+        {
+            "question_text": item["question_text"],
+            "source_file_id": item["source_file_id"],
+            "source_number": item["source_number"],
+            "points": item["points"],
+            "options": [
+                {**option, "is_correct": option["label"] == item["answer_label"]}
+                for option in item["options"]
+            ],
+        }
+        for item in preview["valid_questions"]
+    ]
+    saved = exam_env.client.put(
+        f"/api/admin/exams/{exam['id']}/questions",
+        headers=exam_env.admin_headers,
+        json={"questions": questions},
+    )
+    assert saved.status_code == 200, saved.text
+    assert len(saved.json()["questions"]) == 24
+    duplicate_save = exam_env.client.put(
+        f"/api/admin/exams/{exam['id']}/questions",
+        headers=exam_env.admin_headers,
+        json={"questions": questions + questions},
+    )
+    assert duplicate_save.status_code == 200, duplicate_save.text
+    assert len(duplicate_save.json()["questions"]) == 24
+    published = exam_env.client.post(
+        f"/api/admin/exams/{exam['id']}/publish", headers=exam_env.admin_headers
+    )
+    assert published.status_code == 200, published.text
+    started = exam_env.client.post(
+        f"/api/exams/{exam['id']}/attempts", headers=exam_env.student_headers
+    )
+    assert started.status_code == 201, started.text
+    attempt_id = started.json()["attempt_id"]
+    delivery = exam_env.client.get(f"/api/attempts/{attempt_id}", headers=exam_env.student_headers)
+    assert delivery.status_code == 200, delivery.text
+    delivered = delivery.json()
+    assert len(delivered["questions"]) == 24
+    assert "is_correct" not in str(delivered)
+    student_image_url = delivered["questions"][0]["image_urls"][0]
+    assert (
+        exam_env.client.get(student_image_url, headers=exam_env.student_headers).status_code == 200
+    )
+    assert exam_env.client.get(student_image_url, headers=exam_env.admin_headers).status_code == 403
+
+
+def test_scanned_pdf_upload_uses_ocr_fallback_flag(
+    exam_env: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.exams import router as exam_router
+    from app.exams.pdf_import import PdfQuestion, PdfRegion
+
+    monkeypatch.setenv("EXAM_PDF_STORAGE_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        exam_router,
+        "detect_questions_with_ocr",
+        lambda _doc: [
+            PdfQuestion(
+                number=1,
+                regions=[PdfRegion(1, (0, 70, 600, 260))],
+                extracted_text="OCR question one",
+                options_text={"A": "", "B": ""},
+            ),
+            PdfQuestion(
+                number=2,
+                regions=[PdfRegion(1, (0, 270, 600, 460))],
+                extracted_text="OCR question two",
+                options_text={"A": "", "B": ""},
+            ),
+        ],
+    )
+    exam = _create_draft_exam(exam_env)
+    data = (Path(__file__).parent / "fixtures" / "scanned_image_only.pdf").read_bytes()
+    response = exam_env.client.post(
+        f"/api/admin/exams/{exam['id']}/import-pdf",
+        headers=exam_env.admin_headers,
+        files={"file": ("scan.pdf", data, "application/pdf")},
+        data={"answer_key_text": "1 B\n2 A"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["ocr_used"] is True
+    assert payload["valid_count"] == 2
+    assert all(item["pdf_confidence"] == "0.50" for item in payload["valid_questions"])
+
+
+def test_crop_endpoint_adds_and_removes_page_region(
+    exam_env: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("EXAM_PDF_STORAGE_DIR", str(tmp_path))
+    exam = _create_draft_exam(exam_env)
+    data = (Path(__file__).parent / "fixtures" / "spanning_pages.pdf").read_bytes()
+    upload = exam_env.client.post(
+        f"/api/admin/exams/{exam['id']}/import-pdf",
+        headers=exam_env.admin_headers,
+        files={"file": ("span.pdf", data, "application/pdf")},
+        data={"answer_key_text": "1 A\n2 B"},
+    )
+    assert upload.status_code == 200, upload.text
+    question = upload.json()["valid_questions"][0]
+    assert [region["page"] for region in question["image_regions"]] == [1, 2]
+    endpoint = (
+        f"/api/admin/exams/{exam['id']}/sources/{question['source_file_id']}/questions/1/crops"
+    )
+    removed = exam_env.client.put(
+        endpoint,
+        headers=exam_env.admin_headers,
+        json={"regions": [question["image_regions"][0]]},
+    )
+    assert removed.status_code == 200, removed.text
+    assert len(removed.json()["image_urls"]) == 1
+    restored = exam_env.client.put(
+        endpoint,
+        headers=exam_env.admin_headers,
+        json={"regions": question["image_regions"]},
+    )
+    assert restored.status_code == 200, restored.text
+    assert len(restored.json()["image_urls"]) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -715,8 +924,9 @@ def test_publish_validation_lifecycle_immutability_and_close(
         headers=exam_env.admin_headers,
     )
     assert pub_fail_limit.status_code == 400
-    assert "question_limit exceeds the number of available questions" in (
-        pub_fail_limit.json()["detail"]["errors"]
+    assert (
+        "question_limit exceeds the number of available questions"
+        in (pub_fail_limit.json()["detail"]["errors"])
     )
 
     # Add second question so question_limit == len(questions) (boundary passes).

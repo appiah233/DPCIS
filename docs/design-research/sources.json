@@ -1,0 +1,90 @@
+[
+  {
+    "id": "01-canvas-lms",
+    "product": "Canvas LMS (Instructure)",
+    "category": "Exam/assessment delivery",
+    "url": "https://www.instructure.com/canvas",
+    "status": 200,
+    "pageTitle": "Canvas by Instructure: World Leading LMS for Teaching & Learning",
+    "screenshot": "docs/design-research/01-canvas-lms.png",
+    "capturedAt": "2026-11-14T03:12:19.172Z",
+    "ok": true
+  },
+  {
+    "id": "02-inspera-assessment",
+    "product": "Inspera Assessment",
+    "category": "Exam/assessment delivery",
+    "url": "https://www.inspera.com/products/inspera-assessment/",
+    "status": 200,
+    "pageTitle": "Inspera Assessment| Digital Assessment, Online Exam Software",
+    "screenshot": "docs/design-research/02-inspera-assessment.png",
+    "capturedAt": "2026-11-14T03:12:25.691Z",
+    "ok": true
+  },
+  {
+    "id": "03-tao-testing",
+    "product": "TAO Testing (TAO Advance)",
+    "category": "Exam/assessment delivery",
+    "url": "https://www.taotesting.com/",
+    "status": 200,
+    "pageTitle": "Digital Assessment Platform & Online Testing Software | TAO",
+    "screenshot": "docs/design-research/03-tao-testing.png",
+    "capturedAt": "2026-11-14T03:12:33.524Z",
+    "ok": true
+  },
+  {
+    "id": "04-sat-bluebook",
+    "product": "College Board SAT Bluebook",
+    "category": "Standardised test practice UI",
+    "url": "https://bluebook.collegeboard.org/students",
+    "status": 200,
+    "pageTitle": "Bluebook Digital Testing for Students | College Board",
+    "screenshot": "docs/design-research/04-sat-bluebook.png",
+    "capturedAt": "2026-11-14T03:12:38.883Z",
+    "ok": true
+  },
+  {
+    "id": "05-gradescope",
+    "product": "Gradescope Assessment & Analytics",
+    "category": "Admin/analytics dashboard",
+    "url": "https://www.gradescope.com/",
+    "status": 200,
+    "pageTitle": "Gradescope",
+    "screenshot": "docs/design-research/05-gradescope.png",
+    "capturedAt": "2026-11-14T03:12:45.292Z",
+    "ok": true
+  },
+  {
+    "id": "06-stripe-dashboard-docs",
+    "product": "Stripe Dashboard Documentation",
+    "category": "Admin/analytics dashboard",
+    "url": "https://docs.stripe.com/dashboard/basics",
+    "status": 200,
+    "pageTitle": "Web Dashboard | Stripe Documentation",
+    "screenshot": "docs/design-research/06-stripe-dashboard-docs.png",
+    "capturedAt": "2026-11-14T03:12:56.397Z",
+    "ok": true
+  },
+  {
+    "id": "07-linear-interface",
+    "product": "Linear Product Interface",
+    "category": "Admin/analytics dashboard",
+    "url": "https://linear.app/features",
+    "status": 200,
+    "pageTitle": "Features – Linear",
+    "screenshot": "docs/design-research/07-linear-interface.png",
+    "capturedAt": "2026-11-14T03:13:00.385Z",
+    "ok": true
+  },
+  {
+    "id": "08-khan-academy",
+    "product": "Khan Academy Digital Practice",
+    "category": "Standardised test practice UI",
+    "url": "https://www.khanacademy.org/",
+    "status": 200,
+    "pageTitle": "Khan Academy",
+    "screenshot": "docs/design-research/08-khan-academy.png",
+    "capturedAt": "2026-11-14T03:13:05.447Z",
+    "ok": true
+  }
+]

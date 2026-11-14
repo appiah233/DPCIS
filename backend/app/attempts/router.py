@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
+from fastapi.responses import Response as BinaryResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.attempts import models as attempt_models
 from app.attempts import service
 from app.attempts.schemas import (
     AnswerSaveRequest,
@@ -23,6 +27,8 @@ from app.attempts.schemas import (
 )
 from app.auth.dependencies import AuthIdentity, require_admin, require_student
 from app.database.session import get_db
+from app.exams import models as exam_models
+from app.exams.pdf_storage import load_image
 
 exam_attempt_student_router = APIRouter(
     prefix="/api/exams",
@@ -52,6 +58,39 @@ admin_results_router = APIRouter(
 # ---------------------------------------------------------------------------
 # Student attempt routes
 # ---------------------------------------------------------------------------
+
+
+@attempts_student_router.get("/{attempt_id}/questions/{question_id}/images/{index}")
+def get_question_image_route(
+    attempt_id: UUID,
+    question_id: UUID,
+    index: int,
+    identity: AuthIdentity = Depends(require_student),
+    db: Session = Depends(get_db),
+) -> BinaryResponse:
+    student_id = service.require_student_user_id(identity)
+    attempt = db.get(attempt_models.ExamAttempt, attempt_id)
+    if (
+        attempt is None
+        or attempt.user_id != student_id
+        or attempt.status != "IN_PROGRESS"
+        or service.ensure_utc(attempt.expires_at) <= datetime.now(UTC)
+    ):
+        raise HTTPException(status_code=404, detail="Image not found")
+    link = db.execute(
+        select(attempt_models.AttemptQuestion).where(
+            attempt_models.AttemptQuestion.attempt_id == attempt_id,
+            attempt_models.AttemptQuestion.question_id == question_id,
+        )
+    ).scalar_one_or_none()
+    question = db.get(exam_models.Question, question_id) if link else None
+    if question is None or question.source_file_id is None or question.source_number is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    try:
+        image = load_image(question.source_file_id, question.source_number, index)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="Image not found") from exc
+    return BinaryResponse(content=image, media_type="image/png")
 
 
 @exam_attempt_student_router.post(

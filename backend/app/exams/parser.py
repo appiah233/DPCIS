@@ -126,7 +126,7 @@ from app.exams.schemas import (
 # - Plain numeric headers (`1.`, `1)`) require whitespace or EOL after the
 #   delimiter so decimals like `3.14` never trigger a question boundary.
 QUESTION_START = re.compile(
-    r"^\s*(?:Q(?:uestion)?\s*(\d+)\s*(?::(?:\s*(.*))|[\.\)](?:\s+(.*)|$))|(\d+)[\.\)](?:\s+(.*)|$))",
+    r"^\s*(?:Q(?:uestion)?\s*(\d+)\s*(?::(?:\s*(.*))|[\.\)](?:\s+(.*)|$)|(?:\s+(.*)|$))|(\d+)(?:[\.\)](?:\s+(.*)|$)|\s+(.*)))",
     re.IGNORECASE,
 )
 
@@ -144,8 +144,12 @@ ANSWER_DIRECTIVE = re.compile(
     re.IGNORECASE,
 )
 ANSWER_VALUE = re.compile(r"^([A-Za-z])[\.\)]?$")
-ANSWER_KEY_LINE = re.compile(
-    r"^\s*(?:Q(?:uestion)?\s*)?(\d+)\s*[\.:\)=-]\s*([A-Da-d])\s*$",
+ANSWER_KEY_ENTRY = re.compile(
+    r"(?<!\w)(?:Q(?:uestion)?\s*)?(\d+)\s*[.):-]?\s*([A-Za-z])\b",
+    re.IGNORECASE,
+)
+ANSWER_KEY_ROW = re.compile(
+    r"^\s*(?:Q(?:uestion)?\s*)?(\d+)\s*[.):-]?\s*([A-Za-z])(?:\s+(\d+))?\s*$",
     re.IGNORECASE,
 )
 
@@ -171,7 +175,7 @@ def _normalize_whitespace(text: str) -> str:
 
 def _extract_question_remainder(match: re.Match[str]) -> str:
     """Extract normalized stem text from the first matched tail group."""
-    for group_idx in (2, 3, 5):
+    for group_idx in (2, 3, 4, 6, 7):
         val = match.group(group_idx)
         if val is not None:
             return _normalize_whitespace(val)
@@ -191,7 +195,9 @@ def _segment_blocks(lines: list[str]) -> tuple[list[str], list[list[str]]]:
     current: list[str] | None = None
 
     for line in lines:
-        if QUESTION_START.match(line):
+        match = QUESTION_START.match(line)
+        expected = len(blocks) + (2 if current is not None else 1)
+        if match and int(match.group(1) or match.group(5)) == expected:
             if current is not None:
                 blocks.append(current)
             current = [line]
@@ -528,24 +534,44 @@ def parse_questions_with_answer_key(
     leading, blocks = _segment_blocks(normalized.splitlines())
     problems: list[str] = []
     key: dict[int, OptionLabel] = {}
-    for line_number, line in enumerate(_normalize_input(answer_key_text).splitlines(), start=1):
-        if not line.strip():
-            continue
-        match = ANSWER_KEY_LINE.fullmatch(line)
-        if match is None:
-            problems.append(f"answer key line {line_number} must look like '1. B'")
-            continue
-        number = int(match.group(1))
-        if number in key:
-            problems.append(f"duplicate answer for question {number}")
-        else:
-            key[number] = cast(OptionLabel, match.group(2).upper())
+    marks: dict[int, Decimal] = {}
+    cleaned_key = _normalize_input(answer_key_text).strip()
+    compact = re.fullmatch(r"[A-Da-d]+", re.sub(r"\s+", "", cleaned_key))
+    if compact and not re.search(r"\d", cleaned_key):
+        for number, letter in enumerate(compact.group().upper(), start=1):
+            key[number] = cast(OptionLabel, letter)
+    else:
+        lines = [line.strip() for line in cleaned_key.splitlines() if line.strip()]
+        for index in range(len(lines) - 2):
+            if (
+                re.fullmatch(r"\d+", lines[index])
+                and re.fullmatch(r"[A-Da-d]", lines[index + 1])
+                and re.fullmatch(r"\d+", lines[index + 2])
+            ):
+                number = int(lines[index])
+                key[number] = cast(OptionLabel, lines[index + 1].upper())
+                marks[number] = Decimal(lines[index + 2])
+        for line in cleaned_key.splitlines():
+            row = ANSWER_KEY_ROW.fullmatch(line)
+            for match in ANSWER_KEY_ENTRY.finditer(line):
+                number = int(match.group(1))
+                letter = match.group(2).upper()
+                if letter not in VALID_LABELS:
+                    problems.append(
+                        f"question {number} has invalid answer '{letter}' (expected A-D)"
+                    )
+                elif number in key:
+                    problems.append(f"duplicate answer for question {number}")
+                else:
+                    key[number] = cast(OptionLabel, letter)
+                    if row and row.group(3):
+                        marks[number] = Decimal(row.group(3))
 
     numbered_blocks: list[int] = []
     for block in blocks:
         match = QUESTION_START.match(block[0])
         assert match is not None  # noqa: S101
-        number = int(match.group(1) or match.group(4))
+        number = int(match.group(1) or match.group(5))
         if number in numbered_blocks:
             problems.append(f"duplicate question number {number}")
         numbered_blocks.append(number)
@@ -555,6 +581,10 @@ def parse_questions_with_answer_key(
             )
 
     question_numbers = set(numbered_blocks)
+    if len(key) != len(blocks):
+        problems.append(
+            f"Answer key has {len(key)} answers but {len(blocks)} questions were detected"
+        )
     for number in sorted(question_numbers - key.keys()):
         problems.append(f"missing answer for question {number}")
     for number in sorted(key.keys() - question_numbers):
@@ -584,6 +614,11 @@ def parse_questions_with_answer_key(
     for number, block in zip(numbered_blocks, blocks, strict=True):
         combined += "\n" + "\n".join(block).rstrip() + f"\nANSWER: {key[number]}\n"
     preview = parse_questions(combined)
+    for question in preview.valid_questions + preview.invalid_questions:
+        question.points = marks.get(question.position, DEFAULT_POINTS)
+    preview.normalized_answer_key = ", ".join(
+        f"{number}. {key[number]}" for number in sorted(key)
+    )
     if not preview.errors:
         return preview
     message = "Correct every question and answer before adding this keyed set."

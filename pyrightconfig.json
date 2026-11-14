@@ -1,0 +1,47 @@
+{
+  "venvPath": "backend",
+  "venv": ".venv",
+  "include": [
+    "backend/app",
+    "backend/tests",
+    "backend/alembic"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "backend/.venv",
+    "backend/.pytest_cache*"
+  ],
+  "extraPaths": [
+    "backend"
+  ],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard",
+  "executionEnvironments": [
+    {
+      "root": "backend/tests",
+      "extraPaths": [
+        "backend"
+      ],
+      "reportCallIssue": "none",
+      "reportArgumentType": "none",
+      "reportIndexIssue": "none",
+      "reportGeneralTypeIssues": "none",
+      "reportAttributeAccessIssue": "none",
+      "reportAssignmentType": "none"
+    },
+    {
+      "root": "backend/alembic",
+      "extraPaths": [
+        "backend"
+      ],
+      "reportAttributeAccessIssue": "none"
+    },
+    {
+      "root": "backend",
+      "extraPaths": [
+        "backend"
+      ]
+    }
+  ]
+}

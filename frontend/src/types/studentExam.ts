@@ -47,6 +47,7 @@ export interface AttemptQuestionDelivery {
   id: string;
   display_order: number;
   question_text: string;
+  image_urls?: string[];
   points: string | number;
   options: AttemptOptionDelivery[];
 }

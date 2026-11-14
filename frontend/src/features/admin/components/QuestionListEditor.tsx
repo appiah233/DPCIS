@@ -142,7 +142,7 @@ export function QuestionListEditor({
   };
 
   const handleSaveClick = async () => {
-    if (readOnly || isSaving) {
+    if (readOnly || isSaving || questions.length === 0) {
       return;
     }
     setShowValidation(true);
@@ -205,7 +205,7 @@ export function QuestionListEditor({
           </Alert>
         ) : null}
 
-        {saveSuccessMessage ? (
+        {saveSuccessMessage && questions.length > 0 ? (
           <Alert variant="success" role="status">
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -240,7 +240,7 @@ export function QuestionListEditor({
                   Discard unsaved edits
                 </Button>
               ) : null}
-              <Button type="button" disabled={isSaving} onClick={() => void handleSaveClick()}>
+              <Button type="button" disabled={isSaving || questions.length === 0} onClick={() => void handleSaveClick()}>
                 <Save className="size-4" aria-hidden="true" />
                 <span>{isSaving ? "Saving..." : "Save Questions"}</span>
               </Button>

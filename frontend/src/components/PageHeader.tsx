@@ -1,37 +1,46 @@
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 export interface PageHeaderProps {
+  breadcrumbs?: ReactNode;
   eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
+  meta?: ReactNode;
   action?: ReactNode;
+  className?: string;
 }
 
 export function PageHeader({
+  breadcrumbs,
   eyebrow,
   title,
   description,
+  meta,
   action,
+  className,
 }: PageHeaderProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-5 border-b border-border pb-7 pt-2 sm:flex-row sm:items-end sm:justify-between sm:pb-8">
-      <div className="min-w-0 flex-1 space-y-3">
-        {eyebrow ? (
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-            {eyebrow}
-          </p>
+    <header className={cn("admin-ph", className)}>
+      <div className="min-w-0">
+        {breadcrumbs ? (
+          <nav aria-label="Breadcrumb" className="mb-1 text-xs font-medium text-muted-foreground">
+            {breadcrumbs}
+          </nav>
         ) : null}
-        <h1
-          tabIndex={-1}
-          className="break-words text-3xl font-semibold tracking-tight text-foreground outline-none sm:text-4xl lg:text-[2.75rem]"
-        >
-          {title}
-        </h1>
-        <p className="max-w-prose text-sm leading-6 text-muted-foreground sm:text-base">
-          {description}
-        </p>
+
+        {eyebrow ? <small>{eyebrow}</small> : null}
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1>{title}</h1>
+          {meta ? <div className="flex flex-wrap items-center gap-2">{meta}</div> : null}
+        </div>
+
+        {description ? <p>{description}</p> : null}
       </div>
-      {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}
-    </div>
+
+      {action ? <div className="admin-acts">{action}</div> : null}
+    </header>
   );
 }

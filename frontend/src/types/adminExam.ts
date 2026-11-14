@@ -59,6 +59,13 @@ export interface ExamAdminOut {
 export interface QuestionAdminOut {
   id: string;
   question_text: string;
+  source_file_id?: string | null;
+  source_number?: number | null;
+  image_urls?: string[];
+  image_regions?: Array<{ page: number; bbox: number[] }>;
+  pdf_options_text?: Record<string, string>;
+  pdf_warnings?: string[];
+  pdf_confidence?: DecimalValue | null;
   position: number;
   points: DecimalValue;
   options: QuestionOptionAdminOut[];
@@ -70,6 +77,11 @@ export interface ExamWithQuestionsAdmin extends ExamAdminOut {
 
 export interface QuestionCreate {
   question_text: string;
+  source_file_id?: string | null;
+  source_number?: number | null;
+  pdf_options_text?: Record<string, string>;
+  pdf_warnings?: string[];
+  pdf_confidence?: DecimalValue | null;
   position?: number | null;
   points: DecimalValue;
   options: QuestionOptionCreate[];
@@ -82,6 +94,13 @@ export interface ParsedOption {
 
 export interface ParsedQuestion {
   question_text: string;
+  source_file_id?: string | null;
+  source_number?: number | null;
+  image_urls?: string[];
+  image_regions?: Array<{ page: number; bbox: number[] }>;
+  warnings?: string[];
+  pdf_options_text?: Record<string, string>;
+  pdf_confidence?: DecimalValue | null;
   position: number;
   points: DecimalValue;
   options: ParsedOption[];
@@ -106,6 +125,9 @@ export interface ParseQuestionsResponse {
   total_blocks: number;
   valid_count: number;
   error_count: number;
+  normalized_answer_key?: string | null;
+  page_dimensions?: Array<[number, number]>;
+  ocr_used?: boolean;
 }
 
 export interface ExamResultsSummary {

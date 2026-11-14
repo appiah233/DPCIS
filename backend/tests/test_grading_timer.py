@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -37,7 +38,7 @@ from app.users.models import ApplicationUser
 
 
 @pytest.fixture
-def db_session() -> Session:
+def db_session() -> Iterator[Session]:
     """Provide an isolated in-memory SQLite session with foreign keys enabled."""
     engine = create_engine(
         "sqlite:///:memory:",

@@ -54,10 +54,11 @@ import secrets
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
+from typing import cast
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import Table, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
@@ -537,7 +538,7 @@ def start_attempt(
 
     for display_order, question in enumerate(selected_questions):
         ordered_opts = sorted(question.options, key=lambda o: (o.position, o.id))
-        if exam.randomize_options:
+        if exam.randomize_options and not question.source_file_id:
             _SYSTEM_RANDOM.shuffle(ordered_opts)
         aq = attempt_models.AttemptQuestion(
             attempt_id=attempt.id,
@@ -652,7 +653,11 @@ def get_attempt_for_delivery(
     question_deliveries: list[AttemptQuestionDelivery] = []
     for aq in aq_rows:
         question = aq.question
-        ordered_opts = _order_options_by_snapshot(question.options, aq.option_order)
+        ordered_opts = (
+            sorted(question.options, key=lambda opt: opt.position)
+            if question.source_file_id else
+            _order_options_by_snapshot(question.options, aq.option_order)
+        )
         option_deliveries = [
             AttemptOptionDelivery(
                 id=opt.id,
@@ -666,6 +671,11 @@ def get_attempt_for_delivery(
                 id=question.id,
                 display_order=aq.display_order,
                 question_text=question.question_text,
+                image_urls=(
+                    [f"/api/attempts/{attempt.id}/questions/{question.id}/images/{i}"
+                     for i, _ in enumerate(json.loads(question.image_regions or "[]"))]
+                    if question.source_file_id else []
+                ),
                 points=_quantize(question.points),
                 options=option_deliveries,
             )
@@ -753,7 +763,7 @@ def save_answer(
                 detail="Selected option does not belong to this question",
             )
 
-    table = attempt_models.StudentAnswer.__table__
+    table = cast(Table, attempt_models.StudentAnswer.__table__)
     bind = db.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
 
@@ -1019,7 +1029,7 @@ def get_admin_exam_results(
 
     attempts_only = [attempt for attempt, _student in resolved_rows]
     summary_dict = compute_exam_results_summary(attempts_only)
-    summary = ExamResultsSummary(**summary_dict)
+    summary = ExamResultsSummary.model_validate(summary_dict)
 
     attempt_rows = [
         ExamAdminAttemptRow(

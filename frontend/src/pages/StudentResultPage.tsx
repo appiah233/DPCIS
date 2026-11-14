@@ -206,18 +206,18 @@ export function StudentResultPage() {
   const isTimerExpired = result.submission_reason === "TIMER_EXPIRED";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
-        eyebrow="Examination Outcome"
-        title={result.exam_title}
-        description="Official summary for your completed examination sitting."
+        eyebrow={result.exam_title}
+        title="Your result"
+        description="Official summary for your completed sitting."
         action={
-          <Button asChild variant="outline">
+          <div className="flex gap-2"><Button variant="outline" onClick={() => window.print()}>Print result</Button><Button asChild variant="outline">
             <Link to="/student">
               <ArrowLeft className="size-4" aria-hidden="true" />
-              <span>Back to dashboard</span>
+              <span>Back to examinations</span>
             </Link>
-          </Button>
+          </Button></div>
         }
       />
 
@@ -229,7 +229,7 @@ export function StudentResultPage() {
       ) : null}
 
       {!result.result_visible ? (
-        <Card className="mx-auto max-w-2xl">
+        <Card>
           <CardHeader className="gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
@@ -282,7 +282,11 @@ export function StudentResultPage() {
           </CardContent>
         </Card>
       ) : (
-        <>
+        <div className="student-result-grid"><div className="space-y-6">
+          <div className="student-card student-result-hero">
+            <div className="student-score-ring" style={{ background: `conic-gradient(${result.passed ? "#0f7a4a" : "#b8340a"} ${Math.max(0, Math.min(100, Number(result.percentage)))}%, #f0eef3 0)` }} role="img" aria-label={`${formatPercentage(result.percentage)} score`}><span>{formatPercentage(result.percentage)}</span></div>
+            <div>{result.passed ? <Badge variant="success"><CheckCircle2 className="size-4" />Passed</Badge> : <Badge variant="destructive"><XCircle className="size-4" />Did not pass</Badge>}<h2>You scored {formatDecimalValue(result.points_earned)} of {formatDecimalValue(result.points_available)} points</h2><p>The pass mark for this examination is {formatDecimalValue(result.pass_mark)}%.</p></div>
+          </div>
           <Card>
             <CardHeader className="gap-3 border-b border-border/70 pb-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -383,6 +387,8 @@ export function StudentResultPage() {
             </CardContent>
           </Card>
 
+          <div className="student-card"><div className="student-card-heading"><h2>Answer breakdown</h2></div><div className="student-breakdown" role="img" aria-label={`${result.correct_answers} correct, ${result.incorrect_answers} incorrect, ${result.unanswered_questions} unanswered`}><span style={{ width: `${result.total_questions ? result.correct_answers / result.total_questions * 100 : 0}%`, background: "#0f7a4a" }} /><span style={{ width: `${result.total_questions ? result.incorrect_answers / result.total_questions * 100 : 0}%`, background: "#b8340a" }} /></div></div>
+
           {result.show_correct_answers &&
           result.question_review &&
           result.question_review.length > 0 ? (
@@ -418,7 +424,7 @@ export function StudentResultPage() {
               </div>
             </Alert>
           ) : null}
-        </>
+        </div><aside className="student-card student-details"><div className="student-card-heading"><h2>Sitting details</h2></div><dl><div className="student-detail-row"><dt>Started</dt><dd>{formatDateTime(result.started_at)}</dd></div><div className="student-detail-row"><dt>Submitted</dt><dd>{result.submitted_at ? formatDateTime(result.submitted_at) : "—"}</dd></div><div className="student-detail-row"><dt>Submission</dt><dd>{formatSubmissionReason(result.submission_reason)}</dd></div><div className="student-detail-row"><dt>Questions</dt><dd>{result.total_questions}</dd></div></dl></aside></div>
       )}
     </div>
   );

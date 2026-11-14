@@ -80,6 +80,36 @@ export function parseQuestions(
   });
 }
 
+export function importQuestionPdf(
+  examId: string,
+  file: File,
+  answerKeyText: string,
+  answerFile?: File,
+): Promise<ParseQuestionsResponse> {
+  const body = new FormData();
+  body.set("file", file);
+  body.set("answer_key_text", answerKeyText);
+  if (answerFile) body.set("answer_file", answerFile);
+  return apiPost<ParseQuestionsResponse>(
+    `/api/admin/exams/${encodeURIComponent(examId)}/import-pdf`,
+    { body, timeoutMs: 120000 },
+  );
+}
+
+export function updateQuestionCrops(
+  examId: string,
+  sourceId: string,
+  questionNumber: number,
+  regions: Array<{ page: number; bbox: number[] }>,
+  dpi = 200,
+  padding = 0,
+): Promise<{ regions: Array<{ page: number; bbox: number[] }>; image_urls: string[] }> {
+  return apiPut(
+    `/api/admin/exams/${encodeURIComponent(examId)}/sources/${encodeURIComponent(sourceId)}/questions/${questionNumber}/crops`,
+    { body: { regions, dpi, padding }, timeoutMs: 120000 },
+  );
+}
+
 export function saveExamQuestions(
   examId: string,
   questions: QuestionCreate[],
