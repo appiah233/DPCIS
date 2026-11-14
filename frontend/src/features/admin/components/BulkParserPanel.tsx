@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   ClipboardPaste,
   FilePlus2,
   ListChecks,
@@ -28,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { importQuestionPdf, parseQuestions, updateQuestionCrops } from "@/features/admin/adminApi";
 import { mergeRegions, renumberAnswers, splitRegions } from "@/features/admin/pdfStructure";
 import { extractImportText } from "@/features/admin/extractImportText";
+import { uniqueIncomingPdfQuestions } from "@/features/admin/importDedup";
 import {
   extractAdminApiError,
   fromParsedQuestion,
@@ -54,14 +56,18 @@ export interface BulkParserPanelProps {
   examId: string;
   disabled?: boolean;
   existingQuestionCount: number;
+  existingQuestions: EditableQuestion[];
   onApplyQuestions: (questions: EditableQuestion[], mode: "append" | "replace") => void;
+  onSaveImportedQuestions: (questions: EditableQuestion[]) => Promise<string | null>;
 }
 
 export function BulkParserPanel({
   examId,
   disabled = false,
   existingQuestionCount,
+  existingQuestions,
   onApplyQuestions,
+  onSaveImportedQuestions,
 }: BulkParserPanelProps) {
   const baseId = useId();
   const textareaId = `${baseId}-raw-text`;
@@ -70,13 +76,17 @@ export function BulkParserPanel({
 
   const [rawText, setRawText] = useState("");
   const [questionFile, setQuestionFile] = useState<File | null>(null);
+  const [answerFile, setAnswerFile] = useState<File | null>(null);
+  const [answerFileName, setAnswerFileName] = useState<string | null>(null);
   const [answerKeyText, setAnswerKeyText] = useState("");
   const [activeInput, setActiveInput] = useState<"questions" | "answers">("questions");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isReadingFile, setIsReadingFile] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isSavingImport, setIsSavingImport] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [parseResult, setParseResult] = useState<ParseQuestionsResponse | null>(null);
+  const [previewExpanded, setPreviewExpanded] = useState(true);
   const [acknowledgedKeyMismatch, setAcknowledgedKeyMismatch] = useState(false);
   const [appliedBanner, setAppliedBanner] = useState<string | null>(null);
   const [confirmReplaceMode, setConfirmReplaceMode] = useState<"valid" | "all" | null>(null);
@@ -208,6 +218,8 @@ export function BulkParserPanel({
         catch { setRawText(""); }
       } else {
         setAnswerKeyText(await extractImportText(file));
+        setAnswerFile(file);
+        setAnswerFileName(file.name);
       }
       setParseResult(null);
       setUndoStructure(null);
@@ -244,6 +256,7 @@ export function BulkParserPanel({
         response = await parseQuestions(rawText, answerKeyText);
       }
       setParseResult(response);
+      setPreviewExpanded(true);
       setUndoStructure(null);
       setAcknowledgedKeyMismatch(false);
     } catch (error) {
@@ -258,12 +271,40 @@ export function BulkParserPanel({
     }
   };
 
+  const handleSaveBothFiles = async () => {
+    if (!questionFile || !answerFile || !answerKeyText.trim() || isSavingImport || isParsing || isReadingFile) return;
+    setIsSavingImport(true);
+    setRequestError(null);
+    try {
+      const response = await importQuestionPdf(examId, questionFile, answerKeyText, answerFile);
+      setParseResult(response);
+      setPreviewExpanded(true);
+      if (response.valid_count === 0 || response.invalid_questions.length > 0 || response.errors.length > 0) {
+        setRequestError("The answer key or questions need attention. Review the preview, correct the issues, and try again.");
+        return;
+      }
+      const error = await onSaveImportedQuestions(response.valid_questions.map(fromParsedQuestion));
+      if (error) setRequestError(error);
+    } catch (error) {
+      setRequestError(extractAdminApiError(error, "Could not save the questions and answers.").message);
+    } finally {
+      setIsSavingImport(false);
+    }
+  };
+
   const applyParsedBlocks = (
     items: ParsedQuestion[],
     mode: "append" | "replace",
     includeInvalidNote: boolean,
   ) => {
-    const editable = items.map(fromParsedQuestion);
+    const mapped = items.map(fromParsedQuestion);
+    const editable = mode === "replace"
+      ? mapped
+      : uniqueIncomingPdfQuestions(existingQuestions, mapped);
+    if (editable.length === 0) {
+      setAppliedBanner("These PDF questions are already in the list below. Save the list when ready.");
+      return;
+    }
     onApplyQuestions(editable, mode);
     setAppliedBanner(
       `${mode === "replace" ? "Replaced question list with" : "Added"} ${editable.length} question${editable.length === 1 ? "" : "s"} below.${includeInvalidNote ? " Select a correct answer for any highlighted questions before saving." : " Review and click Save Questions when ready."}`,
@@ -321,8 +362,9 @@ export function BulkParserPanel({
               Import Questions and Answers
             </CardTitle>
             <CardDescription>
-              Paste or upload questions and a separate answer key. Preview validates every answer
-              before it can be saved as the exam's marking key.
+              Paste or upload questions and a separate answer key. Then preview, add the ready
+              questions to the list below, and click Save Questions. Uploading alone does not add
+              questions to the examination.
             </CardDescription>
           </div>
           <Badge variant="outline">
@@ -439,6 +481,7 @@ export function BulkParserPanel({
             />
           </Label>
           <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a PDF up to 100 MB. The PDF must contain selectable text. Preview before publishing.</p>
+          {questionFile ? <p className="mt-2 text-xs font-medium text-foreground">Question PDF ready: {questionFile.name}</p> : null}
         </div>
         </div>
 
@@ -452,6 +495,8 @@ export function BulkParserPanel({
             <Label htmlFor={answerKeyId}>Answers used for marking</Label>
             <Textarea id={answerKeyId} value={answerKeyText} disabled={disabled || isParsing || isReadingFile} rows={10} className="min-h-56 font-mono text-sm" placeholder={"1. B\n2. A\n3. D"} onChange={(event) => {
               setAnswerKeyText(event.target.value);
+              setAnswerFile(null);
+              setAnswerFileName(null);
               setParseResult(null);
               setAppliedBanner(null);
               setRequestError(null);
@@ -477,6 +522,31 @@ export function BulkParserPanel({
             <p className="mt-2 text-xs text-muted-foreground">Or drag and drop a PDF answer key up to 100 MB. The PDF must contain selectable text.</p>
           </div>
         </div>
+
+        {answerKeyText.trim() ? (
+          <Alert variant={parseResult && parseResult.valid_count === parseResult.total_blocks && parseResult.total_blocks > 0 ? "success" : "default"} role="status">
+            <AlertTitle>Answer key {answerFileName ? "uploaded" : "entered"}</AlertTitle>
+            <AlertDescription>
+              {answerFileName ? `${answerFileName}. ` : ""}
+              {parseResult
+                ? `${[...parseResult.valid_questions, ...parseResult.invalid_questions].filter((question) => question.answer_label).length} of ${parseResult.total_blocks} detected questions have a matched answer. Each selected answer is saved with its question for server marking.`
+                : "Preview the questions to match this key before saving."}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        {questionFile && answerFileName ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+            <div>
+              <p className="font-semibold">Both PDF files are ready</p>
+              <p className="text-sm text-muted-foreground">Save the matched questions and correct answers, then continue to Settings.</p>
+            </div>
+            <Button type="button" disabled={disabled || isSavingImport || isParsing || isReadingFile}
+              onClick={() => void handleSaveBothFiles()}>
+              {isSavingImport ? "Saving questions and answers..." : "Save both files and continue"}
+            </Button>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
           <Button
@@ -506,7 +576,7 @@ export function BulkParserPanel({
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <div>
-                <AlertTitle>Questions added below</AlertTitle>
+                <AlertTitle>Import list updated</AlertTitle>
                 <AlertDescription>{appliedBanner}</AlertDescription>
               </div>
             </div>
@@ -517,6 +587,12 @@ export function BulkParserPanel({
           <div className="space-y-4 border-t border-border pt-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-foreground">Question Preview</h3>
+              <Button type="button" variant="outline" aria-expanded={previewExpanded}
+                aria-controls={`${baseId}-preview-content`}
+                onClick={() => setPreviewExpanded((open) => !open)}>
+                <ChevronDown className={cn("size-4 transition-transform", !previewExpanded && "-rotate-90")} aria-hidden="true" />
+                {previewExpanded ? "Collapse preview" : "Expand preview"}
+              </Button>
               {undoStructure ? <Button type="button" variant="outline" disabled={structureBusy}
                 onClick={() => void handleUndoStructure()}>Undo last merge or split</Button> : null}
               <div className="flex flex-wrap gap-2" role="status">
@@ -529,6 +605,7 @@ export function BulkParserPanel({
                 </Badge>
               </div>
             </div>
+            <div id={`${baseId}-preview-content`} hidden={!previewExpanded} className="space-y-4">
             {parseResult.ocr_used ? (
               <Alert role="status">
                 <AlertTitle>OCR used</AlertTitle>
@@ -773,12 +850,13 @@ export function BulkParserPanel({
                 </ol>
               </div>
             ) : null}
+            </div>
           </div>
         ) : null}
       </CardContent>
 
       <CardFooter className="text-xs text-muted-foreground">
-        Previewing does not save changes yet — click Save Questions below when you are ready.
+        After previewing, click Add ready questions above, then Save Questions in the list below.
       </CardFooter>
 
       <ConfirmDialog

@@ -14,4 +14,18 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
   },
+  build: {
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (
+          warning.code === "INVALID_ANNOTATION" &&
+          warning.message.includes("@__PURE__")
+        ) {
+          return;
+        }
+        warn(warning);
+      },
+    },
+  },
 });

@@ -60,7 +60,7 @@ class ExamAttempt(Base):
         default="IN_PROGRESS",
         server_default=text("'IN_PROGRESS'"),
     )
-    submission_reason: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    submission_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
     total_questions: Mapped[int] = mapped_column(Integer, nullable=False)
     correct_answers: Mapped[int] = mapped_column(
         Integer,

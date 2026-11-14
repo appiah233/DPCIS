@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 import fitz
 
@@ -64,9 +66,10 @@ def repeated_bands(doc: fitz.Document) -> dict[int, list[tuple[float, float]]]:
     """Identify text repeated at approximately the same y on most pages."""
     occurrences: Counter[tuple[str, int]] = Counter()
     lines_by_page: list[list[tuple[str, float, float]]] = []
-    for page in doc:
+    for page in cast(Iterable[fitz.Page], doc):
         lines = []
-        for block in page.get_text("dict")["blocks"]:
+        page_dict = cast(dict[str, Any], page.get_text("dict"))
+        for block in page_dict["blocks"]:
             for line in block.get("lines", []):
                 value = " ".join(span["text"].strip() for span in line["spans"]).strip()
                 if value:
@@ -89,9 +92,10 @@ def _excluded(y0: float, y1: float, bands: list[tuple[float, float]]) -> bool:
     return any(y0 >= top and y1 <= bottom for top, bottom in bands)
 
 
-def _ordered_words(page: fitz.Page) -> list[tuple]:
+def _ordered_words(page: fitz.Page) -> list[tuple[Any, ...]]:
     """PDF stream order is not reading order, even within one page."""
-    return sorted(page.get_text("words"), key=lambda w: (w[1], w[0]))
+    words = cast(list[tuple[Any, ...]], page.get_text("words"))
+    return sorted(words, key=lambda w: (w[1], w[0]))
 
 
 def _graphic_regions(page: fitz.Page) -> list[fitz.Rect]:
@@ -130,12 +134,13 @@ def _inside_graphic(word: tuple, regions: list[fitz.Rect]) -> bool:
 
 
 def detect_pdf_questions(doc: fitz.Document) -> list[PdfQuestion]:
+    pages = list(cast(Iterable[fitz.Page], doc))
     bands = repeated_bands(doc)
-    graphics = {index: _graphic_regions(page) for index, page in enumerate(doc)}
+    graphics = {index: _graphic_regions(page) for index, page in enumerate(pages)}
     headers: list[tuple[int, int, float, int]] = []
     columns_by_page: dict[int, bool] = {}
     expected = 1
-    for page_index, page in enumerate(doc):
+    for page_index, page in enumerate(pages):
         words = _ordered_words(page)
         numeric = [
             w
@@ -323,8 +328,8 @@ def render_region(doc: fitz.Document, region: PdfRegion) -> bytes:
 def detect_questions_with_ocr(doc: fitz.Document) -> list[PdfQuestion]:
     """Build a temporary coordinate text layer from Tesseract over source pages."""
     try:
-        import pytesseract
-        from PIL import Image
+        import pytesseract  # type: ignore[import-not-found]
+        from PIL import Image  # type: ignore[import-not-found]
     except ImportError as exc:
         raise OCRUnavailable(
             "OCR is needed for this PDF. Install optional pytesseract and Pillow plus Tesseract."

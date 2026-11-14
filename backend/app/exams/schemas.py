@@ -14,7 +14,14 @@ from decimal import Decimal, InvalidOperation
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 OptionLabel = Literal["A", "B", "C", "D"]
 ExamStatus = Literal["DRAFT", "PUBLISHED", "CLOSED"]
@@ -144,10 +151,10 @@ class ExamCreate(BaseModel):
 
     @field_validator("duration_minutes", "max_attempts", "question_limit", mode="before")
     @classmethod
-    def _validate_int_not_bool(cls, value: object, info) -> object:
+    def _validate_int_not_bool(cls, value: object, info: ValidationInfo) -> object:
         if value is None:
             return None
-        return _reject_bool_numeric(value, field_name=info.field_name)
+        return _reject_bool_numeric(value, field_name=info.field_name or "value")
 
     @field_validator("pass_mark", mode="before")
     @classmethod
@@ -192,10 +199,10 @@ class ExamUpdate(BaseModel):
 
     @field_validator("duration_minutes", "max_attempts", "question_limit", mode="before")
     @classmethod
-    def _validate_int_not_bool(cls, value: object, info) -> object:
+    def _validate_int_not_bool(cls, value: object, info: ValidationInfo) -> object:
         if value is None:
             return None
-        return _reject_bool_numeric(value, field_name=info.field_name)
+        return _reject_bool_numeric(value, field_name=info.field_name or "value")
 
     @field_validator("pass_mark", mode="before")
     @classmethod

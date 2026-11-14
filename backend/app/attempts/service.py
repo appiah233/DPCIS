@@ -54,10 +54,11 @@ import secrets
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
+from typing import cast
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import Table, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
@@ -762,7 +763,7 @@ def save_answer(
                 detail="Selected option does not belong to this question",
             )
 
-    table = attempt_models.StudentAnswer.__table__
+    table = cast(Table, attempt_models.StudentAnswer.__table__)
     bind = db.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
 
@@ -1028,7 +1029,7 @@ def get_admin_exam_results(
 
     attempts_only = [attempt for attempt, _student in resolved_rows]
     summary_dict = compute_exam_results_summary(attempts_only)
-    summary = ExamResultsSummary(**summary_dict)
+    summary = ExamResultsSummary.model_validate(summary_dict)
 
     attempt_rows = [
         ExamAdminAttemptRow(

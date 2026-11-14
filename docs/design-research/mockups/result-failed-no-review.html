@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Result Page — Failed (16.7%, Did not pass) &amp; Review Disabled States</title>
+    <style>
+      :root {
+        --bg-canvas: #f7f8fa;
+        --bg-surface: #ffffff;
+        --bg-subtle: #f1f3f6;
+        --text-primary: #111827;
+        --text-secondary: #4b5563;
+        --text-muted: #6b7280;
+        --border-default: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --accent-primary: #9f1239;
+        --danger: #c2250a;
+        --danger-subtle: #fff4f1;
+        --danger-border: #f9b4a6;
+        --info: #1e40af;
+        --info-subtle: #eff6ff;
+        --info-border: #93c5fd;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg-canvas);
+        color: var(--text-primary);
+        line-height: 1.5;
+      }
+      .direction-banner {
+        background: #111827;
+        color: #f9fafb;
+        padding: 8px 24px;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .direction-banner strong { color: #fecdd3; }
+      .nav-bar {
+        height: 60px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border-default);
+        padding: 0 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .container {
+        max-width: 1080px;
+        margin: 28px auto 64px;
+        padding: 0 24px;
+      }
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-default);
+        margin-bottom: 24px;
+      }
+      .eyebrow {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent-primary);
+      }
+      h1 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin-top: 4px;
+      }
+      .score-hero {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-bottom: 24px;
+        display: grid;
+        grid-template-columns: 1.4fr 2fr;
+        gap: 24px;
+        align-items: center;
+      }
+      .score-main {
+        padding-right: 24px;
+        border-right: 1px solid var(--border-default);
+      }
+      .outcome-pill-failed {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: var(--danger-subtle);
+        border: 1px solid var(--danger-border);
+        color: var(--danger);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .score-pct {
+        font-size: 44px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+      .score-sub {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .kpi-box {
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        padding: 14px;
+      }
+      .kpi-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .kpi-val {
+        font-size: 22px;
+        font-weight: 700;
+        margin-top: 4px;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+      .kpi-sub {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+      .state-section-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin: 28px 0 10px;
+      }
+      .review-disabled-panel {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        padding: 28px 32px;
+        display: flex;
+        align-items: flex-start;
+        gap: 18px;
+      }
+      .icon-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-default);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+      }
+      .item-map-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        padding: 18px 24px;
+      }
+      .item-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        min-width: 52px;
+        height: 36px;
+        padding: 0 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        border: 1px solid var(--border-default);
+      }
+      .item-chip.correct {
+        background: #f0fdf4;
+        border-color: #86efac;
+        color: #166534;
+      }
+      .item-chip.incorrect {
+        background: var(--danger-subtle);
+        border-color: var(--danger-border);
+        color: var(--danger);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="direction-banner">
+      <span><strong>RESULT — FAILED (16.7%, "Did not pass") &amp; REVIEW-DISABLED STATES</strong></span>
+      <span>Calm neutral surface · Outcome shown by icon + text ("✕ Did not pass"), never color alone</span>
+    </div>
+
+    <header class="nav-bar">
+      <div style="font-weight:700; font-size:15px;">Examination Hub · Student Portal</div>
+      <div style="font-size:13px; color:#4b5563;">Ama Mensah · Sign out</div>
+    </header>
+
+    <main class="container">
+      <div class="page-header">
+        <div>
+          <div class="eyebrow">Official Examination Result</div>
+          <h1>Data Protection &amp; Cybersecurity Fundamentals</h1>
+        </div>
+        <button style="height:40px; padding:0 16px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; font-weight:600; font-size:13px;">
+          ← Back to Examinations
+        </button>
+      </div>
+
+      <!-- 1. Calm Failed Score Hero Card (16.7% · Did not pass) -->
+      <section class="score-hero" aria-label="Score summary">
+        <div class="score-main">
+          <span class="outcome-pill-failed">
+            <span aria-hidden="true">✕</span>
+            <span>Did not pass</span>
+          </span>
+          <div class="score-pct">16.7%</div>
+          <div class="score-sub">
+            Pass mark required: 70% · Submitted 14 Nov 2026, 02:34 UTC (Student submitted)
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-box">
+            <div class="kpi-label">Points Earned</div>
+            <div class="kpi-val">1 / 6</div>
+            <div class="kpi-sub">Total marks</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Correct</div>
+            <div class="kpi-val">✓ 1</div>
+            <div class="kpi-sub">of 4 questions</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Incorrect</div>
+            <div class="kpi-val" style="color:var(--danger);">✕ 3</div>
+            <div class="kpi-sub">Marked wrong</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Unanswered</div>
+            <div class="kpi-val">— 0</div>
+            <div class="kpi-sub">Left blank</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- State A: When show_correct_answers === false (Review Disabled by Administrator) -->
+      <div class="state-section-label">
+        State A — When Item Review Is Disabled (`show_correct_answers === false`)
+      </div>
+      <section class="review-disabled-panel" aria-label="Question review policy notice">
+        <span class="icon-circle" aria-hidden="true">🔒</span>
+        <div>
+          <h2 style="font-size:16px; font-weight:600; color:var(--text-primary);">
+            Detailed question review is not enabled for this examination
+          </h2>
+          <p style="font-size:14px; color:var(--text-secondary); margin-top:4px; max-width:65ch;">
+            Your official score and completion record have been saved above. The examination administrator has configured this sitting to show summary results only without releasing individual question answer keys.
+          </p>
+        </div>
+      </section>
+
+      <!-- State B: When show_correct_answers === true (Conditional Item-Map Strip + Review Feed) -->
+      <div class="state-section-label">
+        State B — When Item Review Is Enabled (`show_correct_answers === true`): Conditional Item-Map Jump Strip
+      </div>
+      <section class="item-map-card" aria-label="Question review map">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span style="font-size:13px; font-weight:600; color:var(--text-primary);">
+            Jump to question review (4 questions)
+          </span>
+          <span style="font-size:12px; color:var(--text-secondary);">
+            Every chip uses both icon (✓ / ✕) and label — never color alone
+          </span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <span class="item-chip correct">✓ Q1</span>
+          <span class="item-chip incorrect">✕ Q2</span>
+          <span class="item-chip incorrect">✕ Q3</span>
+          <span class="item-chip incorrect">✕ Q4</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

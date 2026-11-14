@@ -27,6 +27,16 @@ def source_dir(source_id: UUID) -> Path:
     return storage_root() / str(source_id)
 
 
+def store_answer_key_pdf(source_id: UUID, data: bytes) -> None:
+    """Keep the admin's original answer key private beside its question PDF."""
+    directory = source_dir(source_id)
+    if not (directory / "source.pdf").is_file():
+        raise FileNotFoundError("Question PDF source is unavailable")
+    temporary = directory / "answer-key.pdf.tmp"
+    temporary.write_bytes(data)
+    temporary.replace(directory / "answer-key.pdf")
+
+
 def store_pdf(source_id: UUID, data: bytes, questions: list[PdfQuestion]) -> None:
     directory = source_dir(source_id)
     directory.mkdir(parents=True, exist_ok=False)

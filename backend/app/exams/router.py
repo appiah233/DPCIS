@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Iterable
 from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from fastapi import (
@@ -20,6 +22,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import Response as BinaryResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthIdentity, require_admin, require_student
@@ -34,8 +37,17 @@ from app.exams.pdf_import import (
     detect_questions_with_ocr,
     validate_pdf,
 )
-from app.exams.pdf_storage import load_image, regenerate_crops, store_pdf
+from app.exams.pdf_storage import (
+    load_image,
+    load_regions,
+    regenerate_crops,
+    source_dir,
+    store_answer_key_pdf,
+    store_pdf,
+)
 from app.exams.schemas import (
+    VALID_OPTION_LABELS,
+    CropRegionInput,
     CropUpdateRequest,
     CropUpdateResponse,
     ExamAdminOut,
@@ -44,6 +56,7 @@ from app.exams.schemas import (
     ExamStudentOut,
     ExamUpdate,
     ExamWithQuestionsAdmin,
+    OptionLabel,
     ParsedOption,
     ParsedQuestion,
     ParseQuestionsError,
@@ -114,6 +127,7 @@ async def import_pdf_route(
     exam_id: UUID,
     file: UploadFile = File(...),
     answer_key_text: str = Form(default=""),
+    answer_file: UploadFile | None = File(default=None),
     identity: AuthIdentity = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> ParseQuestionsResponse:
@@ -140,20 +154,49 @@ async def import_pdf_route(
         doc.close()
     if not detected:
         raise HTTPException(status_code=422, detail="No numbered questions were detected")
-    source_id = uuid4()
-    try:
-        store_pdf(source_id, data, detected)
-    except OSError as exc:
-        raise HTTPException(status_code=500, detail="PDF storage is unavailable") from exc
-    source = exam_models.ExamSourceFile(
-        id=source_id,
-        exam_id=exam_id,
-        original_filename=(file.filename or "uploaded.pdf")[:255],
-        sha256=hashlib.sha256(data).hexdigest(),
-        page_count=page_count,
-    )
-    db.add(source)
-    db.commit()
+    answer_data: bytes | None = None
+    if answer_file is not None:
+        answer_data = await answer_file.read(MAX_PDF_BYTES + 1)
+        try:
+            answer_doc = validate_pdf(answer_data)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            answer_key_text = "\n".join(
+                str(page.get_text("text")) for page in cast(Iterable[Any], answer_doc)
+            )
+        finally:
+            answer_doc.close()
+        if not answer_key_text.strip():
+            raise HTTPException(status_code=422, detail="Answer PDF contains no selectable text")
+    digest = hashlib.sha256(data).hexdigest()
+    existing = db.scalars(
+        select(exam_models.ExamSourceFile)
+        .where(exam_models.ExamSourceFile.exam_id == exam_id)
+        .where(exam_models.ExamSourceFile.sha256 == digest)
+        .order_by(exam_models.ExamSourceFile.uploaded_at.desc())
+    ).first()
+    if existing is None:
+        source_id = uuid4()
+        try:
+            store_pdf(source_id, data, detected)
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail="PDF storage is unavailable") from exc
+        db.add(exam_models.ExamSourceFile(
+            id=source_id,
+            exam_id=exam_id,
+            original_filename=(file.filename or "uploaded.pdf")[:255],
+            sha256=digest,
+            page_count=page_count,
+        ))
+        db.commit()
+    else:
+        source_id = existing.id
+        if not source_dir(source_id).is_dir():
+            try:
+                store_pdf(source_id, data, detected)
+            except OSError as exc:
+                raise HTTPException(status_code=500, detail="PDF storage is unavailable") from exc
     key: dict[int, tuple[str, Decimal]] = {}
     compact = re.sub(r"\s+", "", answer_key_text)
     if compact and re.fullmatch(r"[A-Da-d]+", compact):
@@ -178,12 +221,25 @@ async def import_pdf_route(
     mismatch = bool(answer_key_text.strip()) and (
         len(key) != len(detected) or set(key) != {question.number for question in detected}
     )
+    if answer_data is not None and not mismatch:
+        try:
+            store_answer_key_pdf(source_id, answer_data)
+        except OSError as exc:
+            raise HTTPException(
+                status_code=500, detail="Answer PDF storage is unavailable"
+            ) from exc
     items: list[ParsedQuestion] = []
     for question in detected:
         answer = key.get(question.number)
         warnings = list(question.warnings)
         if answer is None:
             warnings.append("No answer in the key; select one before saving.")
+        try:
+            regions = load_regions(source_id, question.number)
+        except (OSError, ValueError):
+            regions = [
+                {"page": region.page, "bbox": list(region.bbox)} for region in question.regions
+            ]
         items.append(
             ParsedQuestion(
                 position=question.number,
@@ -192,16 +248,14 @@ async def import_pdf_route(
                 source_number=question.number,
                 image_urls=[
                     f"/api/admin/exams/{exam_id}/source-images/{source_id}/{question.number}/{i}"
-                    for i in range(len(question.regions))
+                    for i in range(len(regions))
                 ],
-                image_regions=[
-                    {"page": region.page, "bbox": list(region.bbox)} for region in question.regions
-                ],
+                image_regions=regions,
                 options=[
                     ParsedOption(label=letter, option_text=f"Option {letter} (see image)")
-                    for letter in "ABCD"
+                    for letter in VALID_OPTION_LABELS
                 ],
-                answer_label=answer[0] if answer else None,
+                answer_label=cast(OptionLabel, answer[0]) if answer else None,
                 points=answer[1] if answer else Decimal(1),
                 valid=answer is not None and not mismatch,
                 warnings=warnings,
@@ -302,7 +356,7 @@ def update_question_crops_route(
     db.commit()
     version = uuid4().hex
     return CropUpdateResponse(
-        regions=regions,
+        regions=[CropRegionInput.model_validate(r) for r in regions],
         image_urls=[
             f"/api/admin/exams/{exam_id}/source-images/{source_id}/{number}/{index}?v={version}"
             for index in range(len(regions))

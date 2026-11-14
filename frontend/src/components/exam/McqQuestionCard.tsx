@@ -72,7 +72,7 @@ export function McqQuestionCard({
         <h2
           ref={headingRef}
           tabIndex={-1}
-          className="text-xs font-semibold uppercase tracking-wider text-primary outline-none"
+          className="select-none text-xs font-semibold uppercase tracking-wider text-primary outline-none"
         >
           Question {questionNumber} of {totalQuestions}
         </h2>
@@ -81,12 +81,12 @@ export function McqQuestionCard({
 
       <CardContent className="pt-5 sm:pt-6">
         <fieldset className="m-0 min-w-0 border-0 p-0">
-          <legend className="mb-5 block w-full break-words p-0 text-lg font-semibold leading-relaxed text-foreground sm:text-xl">
+          <legend className="mb-5 block w-full select-none break-words p-0 text-lg font-semibold leading-relaxed text-foreground sm:text-xl">
             {hasImage ? `Question ${questionNumber}: choose one answer` : questionText}
           </legend>
           {imageUrls.map((path) => (
             <AuthenticatedPdfImage key={path} path={path} alt={questionText}
-              onError={handleImageError} className="mb-4 h-auto w-full max-w-full rounded border" />
+              onError={handleImageError} className="mb-5 h-auto w-full max-w-full rounded-lg border border-border bg-white shadow-sm" />
           ))}
 
           <div className="grid gap-3">

@@ -3,7 +3,7 @@ import { CircleDashed, CircleDot } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { QuestionTile } from "@/components/ui/question-tile";
 import type { AttemptQuestionDelivery } from "@/types/studentExam";
 
 export interface QuestionNavigatorDialogProps {
@@ -57,39 +57,19 @@ export function QuestionNavigatorDialog({
           {questions.map((question, index) => {
             const isCurrent = index === currentIndex;
             const isAnswered = Boolean(answers[question.id]);
-            const statusText = isAnswered ? "Answered" : "Unanswered";
 
             return (
-              <button
+              <QuestionTile
                 key={question.id}
-                type="button"
-                aria-current={isCurrent ? "step" : undefined}
-                aria-label={`Question ${index + 1}, ${statusText}${isCurrent ? ", Current question" : ""}`}
+                questionNumber={index + 1}
+                isCurrent={isCurrent}
+                isAnswered={isAnswered}
+                variant="grid"
                 onClick={() => {
                   onSelectIndex(index);
                   onOpenChange(false);
                 }}
-                className={cn(
-                  "flex min-h-11 cursor-pointer flex-col items-start justify-center gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors",
-                  isCurrent
-                    ? "border-primary bg-accent text-accent-foreground ring-2 ring-primary/25"
-                    : isAnswered
-                      ? "border-border bg-muted text-foreground hover:bg-muted/80"
-                      : "border-border bg-card text-foreground hover:bg-muted",
-                )}
-              >
-                <span className="flex w-full items-center justify-between gap-1.5 text-sm font-semibold tabular-nums">
-                  <span>Q{index + 1}</span>
-                  {isAnswered ? (
-                    <CircleDot className="size-3.5 shrink-0" aria-hidden="true" />
-                  ) : (
-                    <CircleDashed className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  )}
-                </span>
-                <span className="text-xs font-medium">
-                  {isCurrent ? "Current" : statusText}
-                </span>
-              </button>
+              />
             );
           })}
         </div>

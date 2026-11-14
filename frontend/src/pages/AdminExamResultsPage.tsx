@@ -1,34 +1,12 @@
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Clock,
-  Eye,
-  RefreshCw,
-  Search,
-  Settings2,
-  XCircle,
-} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { PageHeader } from "@/components/PageHeader";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  ResponsiveTable,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableRowHead,
-} from "@/components/ui/responsive-table";
+  SegmentedControl,
+  SegmentedControlItem,
+} from "@/components/ui/segmented-control";
 import {
-  EmptyStatePanel,
   ErrorStatePanel,
   LoadingStatePanel,
 } from "@/components/ui/state-panel";
@@ -37,19 +15,33 @@ import {
   extractAdminApiError,
   formatDateTime,
   formatDecimal,
-  formatSubmissionReason,
 } from "@/features/admin/adminUtils";
 import { AttemptDetailDialog } from "@/features/admin/components/AttemptDetailDialog";
 import type { ExamAdminResultsResponse } from "@/types/adminExam";
 
-type AttemptOutcomeFilter = "ALL" | "PASSED" | "FAILED" | "IN_PROGRESS";
+type AttemptOutcomeFilter = "ALL" | "PASSED" | "FAILED";
 
-const OUTCOME_FILTERS: readonly { value: AttemptOutcomeFilter; label: string }[] = [
-  { value: "ALL", label: "All attempts" },
-  { value: "PASSED", label: "Passed" },
-  { value: "FAILED", label: "Failed" },
-  { value: "IN_PROGRESS", label: "In progress" },
-];
+function getInitials(label: string | null | undefined): string {
+  const cleaned = (label ?? "").trim();
+  if (!cleaned) {
+    return "ST";
+  }
+  const parts = cleaned.split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return cleaned.slice(0, 2).toUpperCase();
+}
+
+function getSubmissionSubtitle(reason: string | null | undefined): string {
+  if (reason === "STUDENT_SUBMITTED") {
+    return "Submitted by student";
+  }
+  if (reason === "TIMER_EXPIRED") {
+    return "Timer expired";
+  }
+  return "In progress";
+}
 
 export function AdminExamResultsPage() {
   const { examId } = useParams<{ examId: string }>();
@@ -60,7 +52,6 @@ export function AdminExamResultsPage() {
   const [reloadToken, setReloadToken] = useState(0);
 
   const [outcomeFilter, setOutcomeFilter] = useState<AttemptOutcomeFilter>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
   const [inspectedAttemptId, setInspectedAttemptId] = useState<string | null>(null);
 
   const triggerReload = useCallback(() => {
@@ -102,58 +93,126 @@ export function AdminExamResultsPage() {
     };
   }, [examId, reloadToken]);
 
+  const outcomeCounts = useMemo(() => {
+    if (!results) {
+      return { all: 0, passed: 0, failed: 0, inProgress: 0 };
+    }
+    let passed = 0;
+    let failed = 0;
+    let inProgress = 0;
+    for (const attempt of results.attempts) {
+      if (attempt.status === "GRADED") {
+        if (attempt.passed) passed += 1;
+        else failed += 1;
+      } else {
+        inProgress += 1;
+      }
+    }
+    return {
+      all: results.attempts.length,
+      passed,
+      failed,
+      inProgress,
+    };
+  }, [results]);
+
+  const histogramBuckets = useMemo(() => {
+    const counts = [0, 0, 0, 0, 0];
+    if (!results) {
+      return { counts, max: 0 };
+    }
+    for (const attempt of results.attempts) {
+      if (attempt.status !== "GRADED" || attempt.percentage === null) {
+        continue;
+      }
+      const pct = Number.parseFloat(String(attempt.percentage));
+      if (!Number.isFinite(pct)) {
+        continue;
+      }
+      const idx = Math.min(4, Math.max(0, Math.floor(pct / 20)));
+      counts[idx] += 1;
+    }
+    const max = Math.max(...counts, 0);
+    return { counts, max };
+  }, [results]);
+
   const filteredAttempts = useMemo(() => {
     if (!results) {
       return [];
     }
-    const query = searchQuery.trim().toLocaleLowerCase();
     return results.attempts.filter((attempt) => {
-      if (outcomeFilter === "PASSED" && !(attempt.status === "GRADED" && attempt.passed)) {
-        return false;
+      if (outcomeFilter === "PASSED") {
+        return attempt.status === "GRADED" && Boolean(attempt.passed);
       }
-      if (outcomeFilter === "FAILED" && !(attempt.status === "GRADED" && !attempt.passed)) {
-        return false;
+      if (outcomeFilter === "FAILED") {
+        return attempt.status === "GRADED" && !attempt.passed;
       }
-      if (outcomeFilter === "IN_PROGRESS" && attempt.status === "GRADED") {
-        return false;
-      }
-      if (!query) {
-        return true;
-      }
-      return (
-        (attempt.display_name?.toLocaleLowerCase().includes(query) ?? false) ||
-        (attempt.email?.toLocaleLowerCase().includes(query) ?? false)
-      );
+      return true;
     });
-  }, [results, outcomeFilter, searchQuery]);
+  }, [results, outcomeFilter]);
+
+  const handleExportCsv = () => {
+    if (!results) {
+      return;
+    }
+    const header = [
+      "Student",
+      "Email",
+      "Status",
+      "Points Earned",
+      "Points Available",
+      "Percentage",
+      "Outcome",
+      "Submitted At",
+    ];
+    const rows = results.attempts.map((a) => [
+      a.display_name ?? "Unnamed student",
+      a.email ?? "",
+      a.status,
+      String(a.points_earned ?? ""),
+      String(a.points_available ?? ""),
+      String(a.percentage ?? ""),
+      a.status === "GRADED" ? (a.passed ? "Passed" : "Did not pass") : "In progress",
+      a.submitted_at ?? "",
+    ]);
+    const csv = [header, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${results.exam_title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-results.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <section>
         <PageHeader
-          eyebrow="Student Results"
-          title="Loading Student Results"
-          description="Loading score summary and student attempts..."
+          eyebrow="Results"
+          title="Loading student results"
+          description="Loading score summary and student submissions..."
         />
         <LoadingStatePanel label="Loading student results..." cards={4} />
-      </div>
+      </section>
     );
   }
 
   if (errorMessage || !results) {
     return (
-      <div className="space-y-6">
+      <section>
         <PageHeader
-          eyebrow="Student Results"
-          title="Results Unavailable"
+          eyebrow="Results"
+          title="Results unavailable"
           description="Could not retrieve results for this examination."
           action={
-            <Button asChild variant="outline">
-              <Link to="/admin">
-                <ArrowLeft className="size-4" aria-hidden="true" />
-                <span>Back to Examinations</span>
-              </Link>
-            </Button>
+            <Link className="admin-btn" to="/admin/results">
+              All results
+            </Link>
           }
         />
         <ErrorStatePanel
@@ -161,293 +220,389 @@ export function AdminExamResultsPage() {
           message={errorMessage ?? "Examination results not found."}
           onRetry={triggerReload}
         />
-      </div>
+      </section>
     );
   }
 
   const { summary } = results;
   const hasCompleted = summary.completed_attempts > 0;
+  const passMarkNum = Math.min(
+    100,
+    Math.max(0, Number.parseFloat(String(results.pass_mark)) || 50),
+  );
 
   return (
-    <div className="space-y-8">
+    <section>
       <PageHeader
-        eyebrow="Student Results"
+        eyebrow="Results"
         title={results.exam_title}
-        description={`Pass mark: ${formatDecimal(results.pass_mark, "%")} · Total attempts: ${results.total_attempts}`}
+        description={`Pass mark ${formatDecimal(results.pass_mark, "%")} · ${results.total_attempts} ${results.total_attempts === 1 ? "attempt" : "attempts"}`}
         action={
           <>
-            <Button
+            <button
+              className="admin-btn"
               type="button"
-              variant="outline"
               disabled={isLoading}
               onClick={triggerReload}
             >
-              <RefreshCw className="size-4" aria-hidden="true" />
-              <span>Refresh</span>
-            </Button>
+              <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />
+              </svg>
+              Refresh
+            </button>
+            <button
+              className="admin-btn"
+              type="button"
+              disabled={results.attempts.length === 0}
+              onClick={handleExportCsv}
+            >
+              Export results
+            </button>
             {examId ? (
-              <Button asChild variant="outline">
-                <Link to={`/admin/exams/${examId}`}>
-                  <Settings2 className="size-4" aria-hidden="true" />
-                  <span>Manage Exam</span>
-                </Link>
-              </Button>
-            ) : null}
-            <Button asChild variant="outline">
-              <Link to="/admin">
-                <ArrowLeft className="size-4" aria-hidden="true" />
-                <span>Examinations</span>
+              <Link className="admin-btn p" to={`/admin/exams/${examId}`}>
+                Manage examination
               </Link>
-            </Button>
+            ) : null}
           </>
         }
       />
 
-      <section aria-labelledby="score-summary-heading" className="space-y-3">
-        <h2 id="score-summary-heading" className="text-base font-semibold text-foreground">
-          Score Summary
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle as="h2" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Completed Attempts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {summary.completed_attempts}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle as="h2" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Average Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {hasCompleted ? formatDecimal(summary.average_percentage, "%") : "—"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle as="h2" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Highest Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {hasCompleted ? formatDecimal(summary.highest_percentage, "%") : "—"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle as="h2" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Lowest Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {hasCompleted ? formatDecimal(summary.lowest_percentage, "%") : "—"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle as="h2" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Pass Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {hasCompleted ? formatDecimal(summary.pass_rate, "%") : "—"}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="admin-kpis k5">
+        <div className="admin-card admin-kpi v">
+          <div className="admin-chip c1" aria-hidden="true">
+            <svg className="admin-icon" viewBox="0 0 24 24">
+              <circle cx="9" cy="8" r="4" />
+              <path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a6 6 0 0 0-4-5.6" />
+            </svg>
+          </div>
+          <div>
+            <small>Attempts</small>
+            <b>{results.total_attempts}</b>
+          </div>
         </div>
-      </section>
 
-      {results.attempts.length === 0 ? (
-        <EmptyStatePanel
-          title="No student attempts yet"
-          description="Score summary metrics and student attempt details will appear automatically once students begin this examination."
-        />
-      ) : (
-        <section aria-labelledby="attempts-list-heading" className="space-y-4">
-          <h2 id="attempts-list-heading" className="text-base font-semibold text-foreground">
-            Student Attempts
-          </h2>
-          {!hasCompleted ? (
-            <Alert variant="default" role="status">
-              <AlertTitle>No graded attempts completed yet</AlertTitle>
-              <AlertDescription>
-                {results.total_attempts} attempt{results.total_attempts === 1 ? " is" : "s are"}{" "}
-                currently in progress. Average, highest, lowest, and pass rates will appear once
-                students finish their attempts.
-              </AlertDescription>
-            </Alert>
-          ) : null}
+        <div className="admin-card admin-kpi v">
+          <div className="admin-chip c3" aria-hidden="true">
+            <svg className="admin-icon" viewBox="0 0 24 24">
+              <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+            </svg>
+          </div>
+          <div>
+            <small>Average score</small>
+            <b>
+              {hasCompleted ? formatDecimal(summary.average_percentage, "%") : "0%"}
+            </b>
+          </div>
+        </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter attempts">
-              {OUTCOME_FILTERS.map((filter) => {
-                const isSelected = outcomeFilter === filter.value;
-                return (
-                  <Button
-                    key={filter.value}
-                    type="button"
-                    size="sm"
-                    variant={isSelected ? "default" : "outline"}
-                    aria-pressed={isSelected}
-                    onClick={() => setOutcomeFilter(filter.value)}
-                  >
-                    {filter.label}
-                  </Button>
-                );
-              })}
-            </div>
+        <div className="admin-card admin-kpi v">
+          <div className="admin-chip c2" aria-hidden="true">
+            <svg className="admin-icon" viewBox="0 0 24 24">
+              <path d="m5 12 5 5 9-10" />
+            </svg>
+          </div>
+          <div>
+            <small>Highest</small>
+            <b>
+              {hasCompleted ? formatDecimal(summary.highest_percentage, "%") : "0%"}
+            </b>
+          </div>
+        </div>
 
-            <div className="relative w-full sm:w-72">
-              <Label htmlFor="admin-attempt-search" className="visually-hidden">
-                Search students by name or email
-              </Label>
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <Input
-                id="admin-attempt-search"
-                type="search"
-                value={searchQuery}
-                placeholder="Search student name or email..."
-                className="pl-9"
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
+        <div className="admin-card admin-kpi v">
+          <div className="admin-chip c4" aria-hidden="true">
+            <svg className="admin-icon" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+          </div>
+          <div>
+            <small>Lowest</small>
+            <b>
+              {hasCompleted ? formatDecimal(summary.lowest_percentage, "%") : "0%"}
+            </b>
+          </div>
+        </div>
+
+        <div className="admin-card admin-kpi v">
+          <div className="admin-chip c1" aria-hidden="true">
+            <svg className="admin-icon" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+          </div>
+          <div>
+            <small>Pass rate</small>
+            <b>{hasCompleted ? formatDecimal(summary.pass_rate, "%") : "0%"}</b>
+          </div>
+        </div>
+      </div>
+
+      <div className="admin-split">
+        <div className="admin-card">
+          <div className="admin-ch">
+            <h2>Score distribution</h2>
+            <span className="admin-pill nt">
+              Pass mark {formatDecimal(results.pass_mark, "%")}
+            </span>
+          </div>
+          <div
+            className="admin-chart"
+            role="img"
+            aria-label={`Score distribution across ${summary.completed_attempts} completed attempts`}
+          >
+            {histogramBuckets.counts.map((count, index) => {
+              const heightPct =
+                histogramBuckets.max > 0 && count > 0
+                  ? Math.round((count / histogramBuckets.max) * 100)
+                  : 0;
+              return (
+                <div
+                  key={index}
+                  className={`admin-bar${count > 0 ? " hi" : ""}`}
+                  style={
+                    count > 0
+                      ? { height: `${Math.max(12, heightPct)}%` }
+                      : undefined
+                  }
+                />
+              );
+            })}
+            <div className="admin-pm" style={{ left: `${passMarkNum}%` }}>
+              <span>Pass mark</span>
             </div>
           </div>
+          <div className="admin-xl">
+            <span>0–20%</span>
+            <span>21–40%</span>
+            <span>41–60%</span>
+            <span>61–80%</span>
+            <span>81–100%</span>
+          </div>
+        </div>
 
-          {filteredAttempts.length === 0 ? (
-            <EmptyStatePanel
-              title="No matching student attempts"
-              description="Adjust your search query or outcome filter to view other recorded attempts."
-              action={
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setOutcomeFilter("ALL");
-                    setSearchQuery("");
-                  }}
-                >
-                  Reset filters
-                </Button>
-              }
-            />
-          ) : (
-            <ResponsiveTable caption="Student examination attempts" hideCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Percentage</TableHead>
-                  <TableHead>Outcome</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <div className="admin-card">
+          <div className="admin-ch">
+            <h2>Outcomes</h2>
+          </div>
+          <div
+            className="admin-stk"
+            role="img"
+            aria-label={`${outcomeCounts.failed} failed, ${outcomeCounts.passed} passed`}
+          >
+            {outcomeCounts.all > 0 ? (
+              <>
+                {outcomeCounts.passed > 0 ? (
+                  <i
+                    style={{
+                      width: `${(outcomeCounts.passed / outcomeCounts.all) * 100}%`,
+                      background: "var(--ok)",
+                    }}
+                  />
+                ) : null}
+                {outcomeCounts.failed > 0 ? (
+                  <i
+                    style={{
+                      width: `${(outcomeCounts.failed / outcomeCounts.all) * 100}%`,
+                      background: "var(--danger)",
+                    }}
+                  />
+                ) : null}
+                {outcomeCounts.inProgress > 0 ? (
+                  <i
+                    style={{
+                      width: `${(outcomeCounts.inProgress / outcomeCounts.all) * 100}%`,
+                      background: "var(--line-strong)",
+                    }}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          <div className="admin-lg" style={{ padding: "0 20px 20px" }}>
+            <span>
+              <i style={{ background: "var(--ok)" }} />
+              Passed {outcomeCounts.passed}
+            </span>
+            <span>
+              <i style={{ background: "var(--danger)" }} />
+              Did not pass {outcomeCounts.failed}
+            </span>
+            <span>
+              <i style={{ background: "var(--line-strong)" }} />
+              In progress {outcomeCounts.inProgress}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="admin-card">
+        <div className="admin-ch">
+          <h2>Submissions</h2>
+          <SegmentedControl ariaLabel="Filter outcome">
+            <SegmentedControlItem
+              active={outcomeFilter === "ALL"}
+              count={outcomeCounts.all}
+              onClick={() => setOutcomeFilter("ALL")}
+            >
+              All
+            </SegmentedControlItem>
+            <SegmentedControlItem
+              active={outcomeFilter === "PASSED"}
+              count={outcomeCounts.passed}
+              onClick={() => setOutcomeFilter("PASSED")}
+            >
+              Passed
+            </SegmentedControlItem>
+            <SegmentedControlItem
+              active={outcomeFilter === "FAILED"}
+              count={outcomeCounts.failed}
+              onClick={() => setOutcomeFilter("FAILED")}
+            >
+              Did not pass
+            </SegmentedControlItem>
+          </SegmentedControl>
+        </div>
+
+        {filteredAttempts.length === 0 ? (
+          <div className="admin-empty">
+            <div className="admin-ic">
+              <svg className="admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="9" cy="8" r="4" />
+                <path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a6 6 0 0 0-4-5.6" />
+              </svg>
+            </div>
+            <b>No submissions yet</b>
+            Student submissions will appear here once attempts are recorded.
+          </div>
+        ) : (
+          <div className="admin-tw">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th className="n">Score</th>
+                  <th>Outcome</th>
+                  <th>Submitted</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
                 {filteredAttempts.map((row) => {
                   const isGraded = row.status === "GRADED";
+                  const pctNum = isGraded
+                    ? Math.min(
+                        100,
+                        Math.max(0, Number.parseFloat(String(row.percentage)) || 0),
+                      )
+                    : 0;
+                  const studentName =
+                    row.display_name || row.email || "Unnamed student";
+
                   return (
-                    <TableRow key={row.attempt_id}>
-                      <TableRowHead>
-                        <div className="min-w-0">
-                          <p className="break-words font-semibold text-foreground">
-                            {row.display_name || "Unnamed student"}
-                          </p>
-                          <p className="break-all text-xs font-normal text-muted-foreground">
-                            {row.email || "No email on record"}
-                          </p>
+                    <tr key={row.attempt_id}>
+                      <td>
+                        <div className="admin-mini">
+                          <div
+                            className="admin-av"
+                            style={{
+                              background: "var(--brand-50)",
+                              color: "var(--brand)",
+                            }}
+                            aria-hidden="true"
+                          >
+                            {getInitials(studentName)}
+                          </div>
+                          <div className="admin-tn">
+                            <b>{studentName}</b>
+                            <span>{getSubmissionSubtitle(row.submission_reason)}</span>
+                          </div>
                         </div>
-                      </TableRowHead>
+                      </td>
 
-                      <TableCell label="Status">
-                        <Badge variant={isGraded ? "default" : "secondary"}>
-                          {isGraded ? "Graded" : "In progress"}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell label="Score" className="tabular-nums">
-                        {isGraded
-                          ? `${formatDecimal(row.points_earned)} / ${formatDecimal(row.points_available)}`
-                          : "Pending"}
-                      </TableCell>
-
-                      <TableCell label="Percentage" className="font-semibold tabular-nums">
-                        {isGraded ? formatDecimal(row.percentage, "%") : "—"}
-                      </TableCell>
-
-                      <TableCell label="Outcome">
-                        {!isGraded ? (
-                          <Badge variant="warning">
-                            <Clock className="size-3.5" aria-hidden="true" />
-                            <span>In progress</span>
-                          </Badge>
-                        ) : row.passed ? (
-                          <Badge variant="success">
-                            <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                            <span>Passed</span>
-                          </Badge>
+                      <td className="n">
+                        {isGraded ? (
+                          <div className="admin-mini">
+                            <b>
+                              {formatDecimal(row.points_earned)} /{" "}
+                              {formatDecimal(row.points_available)}
+                            </b>
+                            <div className="admin-meter" aria-hidden="true">
+                              <i
+                                style={{
+                                  width: `${pctNum.toFixed(1)}%`,
+                                  background: row.passed
+                                    ? "var(--ok)"
+                                    : "var(--danger)",
+                                }}
+                              />
+                            </div>
+                            <span>{formatDecimal(row.percentage, "%")}</span>
+                          </div>
                         ) : (
-                          <Badge variant="destructive">
-                            <XCircle className="size-3.5" aria-hidden="true" />
-                            <span>Failed</span>
-                          </Badge>
+                          <span>Pending</span>
                         )}
-                      </TableCell>
+                      </td>
 
-                      <TableCell label="Started" className="text-xs text-muted-foreground">
-                        {formatDateTime(row.started_at)}
-                      </TableCell>
+                      <td>
+                        {!isGraded ? (
+                          <span className="admin-pill nt">
+                            <svg
+                              className="admin-icon"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <circle cx="12" cy="12" r="9" />
+                              <path d="M12 7v5l3 2" />
+                            </svg>
+                            In progress
+                          </span>
+                        ) : row.passed ? (
+                          <span className="admin-pill ok">
+                            <svg
+                              className="admin-icon"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path d="m5 12 5 5 9-10" />
+                            </svg>
+                            Passed
+                          </span>
+                        ) : (
+                          <span className="admin-pill dg">
+                            <svg
+                              className="admin-icon"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path d="m6 6 12 12M18 6 6 18" />
+                            </svg>
+                            Did not pass
+                          </span>
+                        )}
+                      </td>
 
-                      <TableCell label="Submitted" className="text-xs text-muted-foreground">
-                        {formatDateTime(row.submitted_at)}
-                      </TableCell>
+                      <td>{formatDateTime(row.submitted_at)}</td>
 
-                      <TableCell label="Submission reason" className="text-xs">
-                        {formatSubmissionReason(row.submission_reason)}
-                      </TableCell>
-
-                      <TableCell label="Details" stackOnMobile>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setInspectedAttemptId(row.attempt_id)}
-                        >
-                          <Eye className="size-4" aria-hidden="true" />
-                          <span>Review Answers</span>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                      <td>
+                        <div className="admin-act">
+                          <button
+                            className="admin-btn sm"
+                            type="button"
+                            onClick={() => setInspectedAttemptId(row.attempt_id)}
+                          >
+                            View details
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })}
-              </TableBody>
-            </ResponsiveTable>
-          )}
-        </section>
-      )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <AttemptDetailDialog
         attemptId={inspectedAttemptId}
@@ -458,6 +613,6 @@ export function AdminExamResultsPage() {
           }
         }}
       />
-    </div>
+    </section>
   );
 }

@@ -31,7 +31,7 @@ The repository separates API logic, responsive browser UI, identity, database pe
 ## 3. Tools and technologies
 
 | Area | Tools | How they are used |
-|---|---|---|
+| --- | --- | --- |
 | Web interface | React 19, TypeScript, Vite, Tailwind CSS v4, React Router, accessible UI components | One responsive application for student and administrator workflows |
 | API and exam engine | Python 3.12, FastAPI, Pydantic, SQLAlchemy, `psycopg` | Exam authoring, question delivery, autosave, timer enforcement, grading, and authorization |
 | Accounts and data | Neon Managed Better Auth, Neon PostgreSQL | Account sessions and the database-backed `STUDENT`/`ADMIN` role and exam records |
@@ -110,6 +110,7 @@ The repository separates API logic, responsive browser UI, identity, database pe
 ## 5. Implemented API & Frontend Surfaces
 
 ### Backend Endpoints (`backend/app/`)
+
 - **Public & Identity:**
   - `GET /` — Application metadata (`name`, `version`, `environment`, `status`)
   - `GET /health` — Returns `{"status": "healthy"}` (`200`) with zero secrets or infrastructure details
@@ -130,6 +131,7 @@ The repository separates API logic, responsive browser UI, identity, database pe
   - `GET /api/student/attempts` — Authenticated caller's attempt history
 
 ### Frontend Routes (`frontend/src/App.tsx`)
+
 - `/` — Platform overview, health check, and Neon Managed Better Auth sign-in/session card
 - `/student/*` (`STUDENT` role): `/student`, `/student/exams/:examId`, `/student/attempts/:attemptId`, `/student/results/:attemptId`
 - `/admin/*` (`ADMIN` role): `/admin`, `/admin/exams/new`, `/admin/exams/:examId`, `/admin/exams/:examId/results`
@@ -255,6 +257,7 @@ GitHub -> Vercel SPA (Root Directory = frontend, frontend/vercel.json)
 ```
 
 See the full deployment, security, and coordination documentation:
+
 - [`docs/deployment-aws-vercel.md`](docs/deployment-aws-vercel.md) — AWS CodePipeline/CodeBuild, ECS Express Mode, Vercel SPA, Neon Dexta Global, and post-deploy smoke test runbook
 - [`docs/agent-coordination.md`](docs/agent-coordination.md) — Multi-agent & peer engineering ownership ledger and locked API contract
 

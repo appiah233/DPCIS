@@ -8,10 +8,11 @@ interface Props {
   alt: string;
   className?: string;
   onError?: () => void;
+  allowOpenFullSize?: boolean;
 }
 
 /** Fetch private exam imagery with the same bearer token as the JSON API. */
-export function AuthenticatedPdfImage({ path, alt, className, onError }: Props) {
+export function AuthenticatedPdfImage({ path, alt, className, onError, allowOpenFullSize = false }: Props) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -42,9 +43,12 @@ export function AuthenticatedPdfImage({ path, alt, className, onError }: Props) 
 
   if (failed) return <p className="text-sm text-destructive">Question image unavailable.</p>;
   if (!objectUrl) return <p className="text-sm text-muted-foreground">Loading question image…</p>;
-  return (
-    <a href={objectUrl} target="_blank" rel="noopener noreferrer" aria-label="Open question image at full size">
-      <img src={objectUrl} alt={alt} className={className ?? "h-auto max-w-full"} />
-    </a>
-  );
+  const image = <img src={objectUrl} alt={alt} draggable={false}
+    onContextMenu={(event) => event.preventDefault()}
+    className={`${className ?? "h-auto max-w-full"} block select-none`} />;
+  if (allowOpenFullSize) {
+    return <a href={objectUrl} target="_blank" rel="noopener noreferrer"
+      aria-label="Open question image at full size">{image}</a>;
+  }
+  return image;
 }

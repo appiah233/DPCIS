@@ -444,14 +444,37 @@ def save_questions(
     exam = _get_exam_or_404(db, exam_id, load_questions=True, for_update=True)
     _require_draft(exam, "Questions can only be saved on a draft examination")
 
-    positions = _resolve_bulk_positions(questions)
+    # A repeated import may refer to the same PDF through different source IDs.
+    # Keep its last editor entry for each source question; different PDFs remain additive.
+    unique: list[tuple[QuestionCreate, str | None]] = []
+    pdf_positions: dict[tuple[str, int], int] = {}
+    for item in questions:
+        image_regions = _validate_source_reference(db, exam.id, item)
+        if item.source_file_id is not None and item.source_number is not None:
+            source = db.get(exam_models.ExamSourceFile, item.source_file_id)
+            if source is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="Question PDF source is unavailable",
+                )
+            key = (source.sha256, item.source_number)
+            prior = pdf_positions.get(key)
+            if prior is not None:
+                unique[prior] = (item, image_regions)
+                continue
+            pdf_positions[key] = len(unique)
+        unique.append((item, image_regions))
 
-    regions = [_validate_source_reference(db, exam.id, item) for item in questions]
+    deduplicated = [item for item, _ in unique]
+    positions = (
+        list(range(len(unique))) if len(unique) != len(questions)
+        else _resolve_bulk_positions(deduplicated)
+    )
 
     exam.questions.clear()
     db.flush()
 
-    for q_data, pos, image_regions in zip(questions, positions, regions, strict=True):
+    for (q_data, image_regions), pos in zip(unique, positions, strict=True):
         question = _build_question_model(
             exam_id=exam.id,
             data=q_data,

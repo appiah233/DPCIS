@@ -125,6 +125,7 @@ def test_domain_foundation_packages_import_cleanly() -> None:
     assert Question.__tablename__ == "questions"
     assert QuestionOption.__tablename__ == "question_options"
     assert ExamAttempt.__tablename__ == "exam_attempts"
+    assert ExamAttempt.__table__.c.submission_reason.type.length >= len("STUDENT_SUBMITTED")
     assert AttemptQuestion.__tablename__ == "attempt_questions"
     assert StudentAnswer.__tablename__ == "student_answers"
 
@@ -612,7 +613,7 @@ def test_partial_unique_indexes_and_attempt_question_order_uniqueness(
             db.rollback()
 
 
-def test_alembic_infrastructure_has_single_linear_head_0004() -> None:
+def test_alembic_infrastructure_has_single_linear_head_0006() -> None:
     backend_dir = Path(__file__).resolve().parent.parent
     alembic_ini = backend_dir / "alembic.ini"
     alembic_cfg = Config(str(alembic_ini))
@@ -620,10 +621,11 @@ def test_alembic_infrastructure_has_single_linear_head_0004() -> None:
     assert not alembic_cfg.get_main_option("sqlalchemy.url")
 
     script_dir = ScriptDirectory.from_config(alembic_cfg)
-    assert script_dir.get_heads() == ["0005_exam_pdf_sources"]
+    assert script_dir.get_heads() == ["0006_submission_reason"]
 
     history_revs = [rev.revision for rev in script_dir.walk_revisions()]
     assert history_revs == [
+        "0006_submission_reason",
         "0005_exam_pdf_sources",
         "0004_exam_closed_at_and_indexes",
         "0003_attempt_option_order",
@@ -639,6 +641,7 @@ def test_alembic_infrastructure_has_single_linear_head_0004() -> None:
         "0003_attempt_option_order.py",
         "0004_exam_closed_at_and_indexes.py",
         "0005_exam_pdf_sources.py",
+        "0006_submission_reason.py",
     ]
 
 
@@ -673,6 +676,10 @@ def test_alembic_full_chain_offline_postgres_upgrade_and_downgrade_sql(
             assert f"CREATE TABLE {table_name} (" in upgrade_sql
 
         assert "ALTER TABLE attempt_questions ADD COLUMN option_order TEXT;" in upgrade_sql
+        assert (
+            "ALTER TABLE exam_attempts ALTER COLUMN submission_reason TYPE VARCHAR(32);"
+            in upgrade_sql
+        )
         assert "ALTER TABLE exams ADD COLUMN closed_at TIMESTAMP WITH TIME ZONE;" in upgrade_sql
         assert "ALTER TABLE student_answers ALTER COLUMN answered_at SET DEFAULT now();" in (
             upgrade_sql

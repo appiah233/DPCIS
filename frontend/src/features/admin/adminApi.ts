@@ -84,10 +84,12 @@ export function importQuestionPdf(
   examId: string,
   file: File,
   answerKeyText: string,
+  answerFile?: File,
 ): Promise<ParseQuestionsResponse> {
   const body = new FormData();
   body.set("file", file);
   body.set("answer_key_text", answerKeyText);
+  if (answerFile) body.set("answer_file", answerFile);
   return apiPost<ParseQuestionsResponse>(
     `/api/admin/exams/${encodeURIComponent(examId)}/import-pdf`,
     { body, timeoutMs: 120000 },

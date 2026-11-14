@@ -102,7 +102,7 @@ export function PdfCropEditor({ examId, question, pageDimensions, onUpdated }: P
           <p className="text-xs text-muted-foreground">Page {region.page}, top {region.bbox[1].toFixed(1)} pt, bottom {region.bbox[3].toFixed(1)} pt</p>
           <div className="relative border border-border">
             {question.image_urls?.[index] ? (
-              <AuthenticatedPdfImage path={question.image_urls[index]} alt={question.question_text} className="h-auto w-full max-w-full" />
+              <AuthenticatedPdfImage path={question.image_urls[index]} alt={question.question_text} className="h-auto w-full max-w-full" allowOpenFullSize />
             ) : null}
             <button type="button" disabled={saving} onPointerDown={(event) => startDrag(event, index, "top")}
               onKeyDown={(event) => { if (event.key === "ArrowUp" || event.key === "ArrowDown") {

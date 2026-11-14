@@ -18,7 +18,9 @@ from app.users.service import upsert_application_user
 logger = logging.getLogger("examination_hub.api")
 
 
-def _apply_security_headers(response: Response, request_id: str) -> Response:
+def _apply_security_headers[ResponseT: Response](
+    response: ResponseT, request_id: str
+) -> ResponseT:
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"

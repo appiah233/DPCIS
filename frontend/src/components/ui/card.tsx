@@ -1,4 +1,4 @@
-import type { HTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ export function CardHeader({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex min-w-0 flex-col flex-wrap gap-2 p-4 sm:p-6", className)}
+      className={cn("flex min-w-0 flex-col flex-wrap gap-1.5 p-5 sm:p-6", className)}
       {...props}
     />
   );
@@ -47,7 +47,7 @@ export function CardTitle({
   return (
     <Comp
       className={cn(
-        "min-w-0 break-words text-lg font-semibold leading-snug tracking-tight",
+        "min-w-0 break-words text-lg font-semibold leading-snug tracking-tight text-foreground",
         className,
       )}
       {...props}
@@ -72,7 +72,7 @@ export function CardContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("min-w-0 flex-1 px-4 pb-4 sm:px-6 sm:pb-6", className)} {...props} />
+    <div className={cn("min-w-0 flex-1 px-5 pb-5 sm:px-6 sm:pb-6", className)} {...props} />
   );
 }
 
@@ -83,10 +83,68 @@ export function CardFooter({
   return (
     <footer
       className={cn(
-        "flex min-w-0 flex-wrap items-center gap-3 border-t border-border/70 px-4 py-4 sm:px-6",
+        "flex min-w-0 flex-wrap items-center gap-3 border-t border-border px-5 py-4 sm:px-6",
         className,
       )}
       {...props}
     />
+  );
+}
+
+export interface StatCardProps extends HTMLAttributes<HTMLElement> {
+  label: string;
+  value: ReactNode;
+  sublabel?: ReactNode;
+  icon?: ReactNode;
+  tone?: "default" | "accent" | "success" | "warning" | "danger";
+}
+
+const statToneClasses: Record<NonNullable<StatCardProps["tone"]>, string> = {
+  default: "text-foreground",
+  accent: "text-primary",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-destructive",
+};
+
+export function StatCard({
+  label,
+  value,
+  sublabel,
+  icon,
+  tone = "default",
+  className,
+  ...props
+}: StatCardProps) {
+  return (
+    <Card
+      as="article"
+      className={cn("justify-between p-5", className)}
+      {...props}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        {icon ? (
+          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+            {icon}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-2 space-y-1">
+        <p
+          className={cn(
+            "text-2xl font-bold tracking-tight tabular-nums sm:text-3xl",
+            statToneClasses[tone],
+          )}
+        >
+          {value}
+        </p>
+        {sublabel ? (
+          <p className="text-xs text-muted-foreground">{sublabel}</p>
+        ) : null}
+      </div>
+    </Card>
   );
 }

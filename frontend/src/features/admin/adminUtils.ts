@@ -146,7 +146,9 @@ export function formatDecimal(
   }
   const formatted = Number.isInteger(numeric)
     ? String(numeric)
-    : numeric.toFixed(2).replace(/\.?0+$/, "");
+    : suffix === "%"
+      ? numeric.toFixed(1).replace(/\.0$/, "")
+      : numeric.toFixed(2).replace(/\.?0+$/, "");
   return suffix ? `${formatted}${suffix}` : formatted;
 }
 

@@ -8,6 +8,7 @@ import { McqQuestionCard } from "@/components/exam/McqQuestionCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
+import { QuestionTile } from "@/components/ui/question-tile";
 import { ErrorStatePanel, LoadingStatePanel } from "@/components/ui/state-panel";
 import { QuestionNavigatorDialog } from "@/features/student/QuestionNavigatorDialog";
 import { formatDurationMinutes } from "@/features/student/formatters";
@@ -107,7 +108,7 @@ export function StudentAttemptPage() {
   const currentSelection = currentQuestion ? (answers[currentQuestion.id] ?? null) : null;
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
+    <div className="student-attempt-page student-attempt-grid">
       <div className="min-w-0 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs sm:px-5">
         <div className="min-w-0 space-y-0.5">
@@ -279,30 +280,28 @@ export function StudentAttemptPage() {
 
       </div>
 
-      <aside aria-label="Question progress" className="hidden rounded-lg border border-border bg-card p-4 lg:sticky lg:top-4 lg:block">
-        <h2 className="text-base font-semibold text-foreground">Questions</h2>
-        <p className="mt-1 text-sm text-muted-foreground" aria-live="polite">{answeredCount} of {totalQuestions} answered</p>
-        <div className="mt-4 space-y-2">
+      <aside aria-label="Question progress" className="student-card student-question-map">
+        <div className="student-card-heading"><h2>Question map</h2><span className="text-xs text-muted-foreground">{answeredCount} answered</span></div>
+        <div className="student-question-map-grid">
           {questions.map((question, index) => {
             const isAnswered = Boolean(answers[question.id]);
             const isCurrent = index === currentIndex;
             return (
-              <button
+              <QuestionTile
                 key={question.id}
-                type="button"
-                aria-current={isCurrent ? "step" : undefined}
-                aria-label={`Question ${index + 1}, ${isAnswered ? "answered" : "unanswered"}${isCurrent ? ", current" : ""}`}
+                questionNumber={index + 1}
+                isCurrent={isCurrent}
+                isAnswered={isAnswered}
+                variant="grid"
                 onClick={() => navigateToQuestion(index)}
-                className={`flex min-h-11 w-full items-center gap-3 rounded-md border px-3 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isCurrent ? "border-primary bg-accent" : "border-border hover:bg-muted"}`}
-              >
-                <span className={`size-3 shrink-0 rounded-full border-2 ${isAnswered ? "border-primary bg-primary" : "border-muted-foreground"}`} aria-hidden="true" />
-                <span>Question {index + 1}</span>
-                <span className="sr-only">{isAnswered ? "Answered" : "Unanswered"}</span>
-              </button>
+              />
             );
           })}
         </div>
+        <div className="border-t border-border p-4"><Button variant="outline" className="w-full" onClick={() => setIsSubmitDialogOpen(true)}>Review before submitting</Button></div>
       </aside>
+
+      <div className="student-mobile-controls"><Button variant="outline" disabled={currentIndex === 0 || isLocked} onClick={() => navigateToQuestion(currentIndex - 1)}>Previous</Button><Button variant="outline" onClick={() => setIsNavigatorOpen(true)} aria-label="Open question map"><LayoutGrid className="size-4" />{currentIndex + 1} of {totalQuestions}</Button>{currentIndex < totalQuestions - 1 ? <Button disabled={isLocked} onClick={() => navigateToQuestion(currentIndex + 1)}>Next</Button> : <Button disabled={isLocked} onClick={() => setIsSubmitDialogOpen(true)}>Review</Button>}</div>
 
       <QuestionNavigatorDialog
         open={isNavigatorOpen}

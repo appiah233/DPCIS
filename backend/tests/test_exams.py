@@ -110,7 +110,7 @@ def _sample_question_payload(
 
 
 @pytest.fixture
-def exam_env(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+def exam_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[SimpleNamespace]:
     private_key = Ed25519PrivateKey.generate()
     public_key = private_key.public_key()
     monkeypatch.setattr(
@@ -254,7 +254,12 @@ def test_pdf_upload_preview_and_private_image_delivery(
                 "paper.pdf",
                 (fixture_dir / "atomic_structure_qp.pdf").read_bytes(),
                 "application/pdf",
-            )
+            ),
+            "answer_file": (
+                "mark-scheme.pdf",
+                (fixture_dir / "atomic_structure_ms.pdf").read_bytes(),
+                "application/pdf",
+            ),
         },
         data={"answer_key_text": key_text},
     )
@@ -262,6 +267,28 @@ def test_pdf_upload_preview_and_private_image_delivery(
     preview = upload.json()
     assert preview["valid_count"] == 24
     assert preview["valid_questions"][0]["answer_label"] == "B"
+    source_id = preview["valid_questions"][0]["source_file_id"]
+    assert (tmp_path / source_id / "answer-key.pdf").read_bytes() == (
+        fixture_dir / "atomic_structure_ms.pdf"
+    ).read_bytes()
+    repeated = exam_env.client.post(
+        f"/api/admin/exams/{exam['id']}/import-pdf",
+        headers=exam_env.admin_headers,
+        files={
+            "file": (
+                "same-paper.pdf",
+                (fixture_dir / "atomic_structure_qp.pdf").read_bytes(),
+                "application/pdf",
+            )
+        },
+        data={"answer_key_text": key_text},
+    )
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["valid_count"] == 24
+    assert (
+        repeated.json()["valid_questions"][0]["source_file_id"]
+        == preview["valid_questions"][0]["source_file_id"]
+    )
     image_url = preview["valid_questions"][3]["image_urls"][0]
     assert exam_env.client.get(image_url, headers=exam_env.student_headers).status_code == 403
     image = exam_env.client.get(image_url, headers=exam_env.admin_headers)
@@ -316,6 +343,13 @@ def test_pdf_upload_preview_and_private_image_delivery(
     )
     assert saved.status_code == 200, saved.text
     assert len(saved.json()["questions"]) == 24
+    duplicate_save = exam_env.client.put(
+        f"/api/admin/exams/{exam['id']}/questions",
+        headers=exam_env.admin_headers,
+        json={"questions": questions + questions},
+    )
+    assert duplicate_save.status_code == 200, duplicate_save.text
+    assert len(duplicate_save.json()["questions"]) == 24
     published = exam_env.client.post(
         f"/api/admin/exams/{exam['id']}/publish", headers=exam_env.admin_headers
     )
