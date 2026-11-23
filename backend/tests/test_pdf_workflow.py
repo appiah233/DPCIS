@@ -54,6 +54,63 @@ def _create_draft(exam_env: SimpleNamespace, title: str = "PDF Workflow Exam") -
     return resp.json()
 
 
+def test_reimport_keeps_successful_crop_repairs_but_not_failed_repairs(
+    exam_env: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.exams import router as exams_router
+    from app.exams.pdf_storage import has_reviewed_crop, load_regions
+
+    monkeypatch.setenv("EXAM_PDF_STORAGE_DIR", str(tmp_path))
+    process = exams_router._process_pdf_upload_sync
+
+    def flagged_process(data: bytes) -> tuple:
+        result = process(data)
+        result[0][0].crop_valid = False
+        result[0][0].warnings.append("Crop failed: partially clipped graphic; expand the crop.")
+        return result
+
+    monkeypatch.setattr(exams_router, "_process_pdf_upload_sync", flagged_process)
+    exam = _create_draft(exam_env)
+    pdf = _build_pdf([
+        [((72, 90), "1 Which option is correct?"), ((72, 110), "A Alpha B Beta C Gamma D Delta")]
+    ])
+
+    def preview(key: str = "1 B") -> dict:
+        response = exam_env.client.post(
+            f"/api/admin/exams/{exam['id']}/import-pdf",
+            headers=exam_env.admin_headers,
+            files={"file": ("paper.pdf", pdf, "application/pdf")},
+            data={"answer_key_text": key},
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    initial = preview()
+    assert len(initial["invalid_questions"]) == 1
+    source = initial["source_file_id"]
+    endpoint = f"/api/admin/exams/{exam['id']}/sources/{source}/questions/1/crops"
+    invalid = exam_env.client.put(endpoint, headers=exam_env.admin_headers, json={
+        "regions": [{"page": 1, "bbox": [0, 0, 595, 10]}], "strict": False,
+    })
+    assert invalid.status_code == 422
+    assert len(preview()["invalid_questions"]) == 1
+    repaired = exam_env.client.put(endpoint, headers=exam_env.admin_headers, json={
+        "regions": [{"page": 1, "bbox": [40, 50, 550, 150]}], "strict": False,
+    })
+    assert repaired.status_code == 200, repaired.text
+    repeated = preview()
+    assert len(repeated["valid_questions"]) == 1
+    assert not repeated["valid_questions"][0]["errors"]
+    assert not any(w.startswith("Crop failed:") for w in repeated["valid_questions"][0]["warnings"])
+    assert len(preview("")["invalid_questions"]) == 1  # Repair does not bypass answer validation.
+    from uuid import UUID
+
+    stored = load_regions(UUID(source), 1)
+    assert has_reviewed_crop(UUID(source), 1, stored)
+    stored[0]["bbox"][1] += 1
+    assert not has_reviewed_crop(UUID(source), 1, stored)
+
+
 def test_pdf_import_text_diagrams_equations_tables_and_answer_key_formats(
     exam_env: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

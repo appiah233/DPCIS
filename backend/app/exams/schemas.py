@@ -31,8 +31,6 @@ _NON_NULLABLE_EXAM_UPDATE_FIELDS: tuple[str, ...] = (
     "title",
     "duration_minutes",
     "pass_mark",
-    "randomize_questions",
-    "randomize_options",
     "max_attempts",
     "show_result",
     "show_correct_answers",
@@ -133,8 +131,6 @@ class ExamCreate(BaseModel):
         decimal_places=2,
     )
     question_limit: int | None = Field(default=None, ge=1)
-    randomize_questions: bool = False
-    randomize_options: bool = False
     max_attempts: int = Field(default=1, ge=1)
     show_result: bool = True
     show_correct_answers: bool = False
@@ -179,8 +175,6 @@ class ExamUpdate(BaseModel):
         decimal_places=2,
     )
     question_limit: int | None = Field(default=None, ge=1)
-    randomize_questions: bool | None = None
-    randomize_options: bool | None = None
     max_attempts: int | None = Field(default=None, ge=1)
     show_result: bool | None = None
     show_correct_answers: bool | None = None
@@ -229,8 +223,6 @@ class ExamAdminOut(BaseModel):
     duration_minutes: int
     pass_mark: Decimal
     question_limit: int | None
-    randomize_questions: bool
-    randomize_options: bool
     max_attempts: int
     show_result: bool
     show_correct_answers: bool
@@ -261,8 +253,6 @@ class ExamStudentOut(BaseModel):
     duration_minutes: int
     pass_mark: Decimal
     question_limit: int | None
-    randomize_questions: bool
-    randomize_options: bool
     max_attempts: int
     show_result: bool
     question_count: int = 0

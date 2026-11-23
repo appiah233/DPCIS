@@ -10,3 +10,8 @@ export const signOutNeonAuth = async () => {};
 export const signInWithEmail = async () => ({ error: null });
 export const signUpWithEmail = async () => ({ error: null });
 export const signInWithGoogle = async () => ({ error: null });
+const unsupportedAuthFlow = async () => { throw new Error("Auth flow is outside the PDF browser harness"); };
+export const requestPasswordCode = unsupportedAuthFlow;
+export const resetPasswordWithCode = unsupportedAuthFlow;
+export const sendEmailVerificationCode = unsupportedAuthFlow;
+export const verifyEmailCode = unsupportedAuthFlow;

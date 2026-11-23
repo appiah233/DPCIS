@@ -20,6 +20,7 @@ interface Props {
   initialRegion: PageCropRegion;
   title?: string;
   busy?: boolean;
+  error?: string | null;
   onApply: (region: PageCropRegion) => Promise<void> | void;
 }
 
@@ -51,6 +52,7 @@ export function PdfPageCropModal({
   initialRegion,
   title = "Crop question from PDF page",
   busy = false,
+  error,
   onApply,
 }: Props) {
   const totalPages = Math.max(1, pageDimensions.length);
@@ -61,10 +63,12 @@ export function PdfPageCropModal({
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
 
+  const initialPage = initialRegion.page;
+  const [initialLeft, initialTop, initialRight, initialBottom] = initialRegion.bbox;
   useEffect(() => {
     if (open) {
-      setPage(Math.min(Math.max(1, initialRegion.page), totalPages));
-      setBbox(initialRegion.bbox);
+      setPage(Math.min(Math.max(1, initialPage), totalPages));
+      setBbox([initialLeft, initialTop, initialRight, initialBottom]);
       setZoomPct(100);
       setMode("edit");
     }
@@ -72,7 +76,7 @@ export function PdfPageCropModal({
       dragCleanupRef.current?.();
       dragCleanupRef.current = null;
     };
-  }, [open, initialRegion, totalPages]);
+  }, [open, initialPage, initialLeft, initialTop, initialRight, initialBottom, totalPages]);
 
   const [pageWidth, pageHeight] = pageDimensions[page - 1] ?? [595, 842];
   const leftPct = (bbox[0] / pageWidth) * 100;
@@ -219,6 +223,7 @@ export function PdfPageCropModal({
       }
     >
       <div className="space-y-3">
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <div className="flex flex-wrap items-center gap-1.5">
           <Button
             type="button"

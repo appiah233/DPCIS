@@ -237,8 +237,6 @@ def _create_and_publish_exam(
     duration_minutes: int = 30,
     pass_mark: str | Decimal = Decimal("50.00"),
     question_limit: int | None = None,
-    randomize_questions: bool = False,
-    randomize_options: bool = False,
     max_attempts: int = 2,
     show_result: bool = True,
     show_correct_answers: bool = False,
@@ -253,8 +251,6 @@ def _create_and_publish_exam(
             "duration_minutes": duration_minutes,
             "pass_mark": str(pass_mark),
             "question_limit": question_limit,
-            "randomize_questions": randomize_questions,
-            "randomize_options": randomize_options,
             "max_attempts": max_attempts,
             "show_result": show_result,
             "show_correct_answers": show_correct_answers,
@@ -531,8 +527,6 @@ def test_delivery_frozen_snapshot_normalized_labels_and_saved_answers(
         title="Randomized Snapshot Exam",
         duration_minutes=45,
         question_limit=3,
-        randomize_questions=True,
-        randomize_options=True,
         max_attempts=1,
         questions=questions,
     )
@@ -633,11 +627,7 @@ def test_delivery_frozen_snapshot_normalized_labels_and_saved_answers(
 def test_non_randomized_snapshot_freezes_positional_option_order(
     attempt_env: SimpleNamespace,
 ) -> None:
-    exam = _create_and_publish_exam(
-        attempt_env,
-        randomize_questions=False,
-        randomize_options=False,
-    )
+    exam = _create_and_publish_exam(attempt_env)
     start_resp = attempt_env.client.post(
         f"/api/exams/{exam['id']}/attempts",
         headers=attempt_env.student_a_headers,
@@ -679,7 +669,6 @@ def test_autosave_idempotency_validation_and_timer_expiry_lock(
         attempt_env,
         title="Main Exam",
         question_limit=2,
-        randomize_questions=False,
     )
     attempt_id = attempt_env.client.post(
         f"/api/exams/{exam['id']}/attempts",
@@ -1004,7 +993,6 @@ def test_submit_idempotency_immutability_and_result_disclosure(
     exam2 = _create_and_publish_exam(
         attempt_env,
         title="Full Review Exam",
-        randomize_options=True,
         show_result=True,
         show_correct_answers=True,
     )
@@ -1529,3 +1517,35 @@ def test_concurrent_double_start_simultaneous_saves_and_save_vs_submit_races(
                 assert final_percentage == Decimal("0.00")
     finally:
         engine.dispose()
+
+
+def test_start_attempt_ignores_legacy_randomize_flags_in_db(
+    attempt_env: SimpleNamespace,
+) -> None:
+    exam = _create_and_publish_exam(attempt_env, title="Legacy Flags Exam")
+    from app.exams.models import Exam as ExamModel
+
+    with attempt_env.session_factory() as db:
+        row = db.get(ExamModel, UUID(str(exam["id"])))
+        assert row is not None
+        row.randomize_questions = True
+        row.randomize_options = True
+        db.add(row)
+        db.commit()
+
+    start_resp = attempt_env.client.post(
+        f"/api/exams/{exam['id']}/attempts",
+        headers=attempt_env.student_a_headers,
+    )
+    assert start_resp.status_code == 201
+    attempt_id = start_resp.json()["attempt_id"]
+
+    deliv = attempt_env.client.get(
+        f"/api/attempts/{attempt_id}",
+        headers=attempt_env.student_a_headers,
+    )
+    assert deliv.status_code == 200
+    body = deliv.json()
+    assert [q["id"] for q in body["questions"]] == [q["id"] for q in exam["questions"]]
+    for delivered_q, exam_q in zip(body["questions"], exam["questions"], strict=True):
+        assert [o["id"] for o in delivered_q["options"]] == [o["id"] for o in exam_q["options"]]

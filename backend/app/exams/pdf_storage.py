@@ -129,6 +129,21 @@ def load_image(source_id: UUID, question_number: int, index: int) -> bytes:
     return (source_dir(source_id) / f"{question_number}-{index}.png").read_bytes()
 
 
+def has_reviewed_crop(source_id: UUID, question_number: int, regions: list[dict]) -> bool:
+    """Trust a successful administrator repair only for the exact stored regions."""
+    directory = source_dir(source_id)
+    try:
+        reviewed = json.loads(
+            (directory / f"{question_number}.reviewed.json").read_text(encoding="utf-8")
+        )
+        return bool(regions) and reviewed == regions and all(
+            (directory / f"{question_number}-{index}.png").is_file()
+            for index in range(len(regions))
+        )
+    except (OSError, ValueError):
+        return False
+
+
 def render_source_page(source_id: UUID, page_number: int, *, dpi: int = 150) -> bytes:
     """Render and cache a full PDF page as a lossless PNG for visual crop review."""
     max_dpi = get_settings().MAX_PDF_RENDER_DPI
@@ -262,4 +277,11 @@ def regenerate_crops(
         json_tmp.replace(directory / f"{question_number}.json")
     finally:
         json_tmp.unlink(missing_ok=True)
+    reviewed = directory / f"{question_number}.reviewed.json"
+    reviewed_tmp = directory / f"{question_number}.{uuid4().hex}.reviewed.tmp"
+    try:
+        reviewed_tmp.write_text(json.dumps(normalized), encoding="utf-8")
+        reviewed_tmp.replace(reviewed)
+    finally:
+        reviewed_tmp.unlink(missing_ok=True)
     return normalized

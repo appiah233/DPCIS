@@ -23,12 +23,11 @@ Invariants
    ``attempt_id``, ``started_at``, ``expires_at``, question order, and option
    order.
 3. **Frozen Snapshot & Normalized Labels:** At attempt creation, selected
-   questions are frozen in ``attempt_questions.display_order`` and every
-   question's option UUID order is frozen as JSON in
-   ``attempt_questions.option_order`` (shuffled once when
-   ``randomize_options=True``, positional otherwise). Delivery emits options in
-   the frozen order with sequential labels ``"A"``–``"D"`` while keeping option
-   UUIDs canonical for autosave and grading.
+   questions are stored in deterministic positional order in
+   ``attempt_questions.display_order`` and every question's option UUID order
+   is stored in ``attempt_questions.option_order``. Delivery emits options in
+   the snapshot order with sequential labels ``"A"``–``"D"`` while keeping
+   option UUIDs canonical for autosave and grading.
 4. **Answer-Key & Score Isolation (``RULE 9``, ``RULE 10``):** Active delivery
    and autosave never accept client scores or expose ``is_correct``,
    ``correct_option_id``, or ``pass_mark``. Post-submission results withhold
@@ -50,7 +49,6 @@ Invariants
 from __future__ import annotations
 
 import json
-import secrets
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -101,7 +99,6 @@ from app.users.models import ApplicationUser
 
 VALID_OPTION_LABELS: tuple[OptionLabel, ...] = ("A", "B", "C", "D")
 TWO_PLACES = Decimal("0.01")
-_SYSTEM_RANDOM = secrets.SystemRandom()
 
 
 class AttemptConflictException(HTTPException):
@@ -516,8 +513,6 @@ def start_attempt(
         )
 
     selected_questions = list(all_questions)
-    if exam.randomize_questions:
-        _SYSTEM_RANDOM.shuffle(selected_questions)
     if exam.question_limit is not None and exam.question_limit < len(selected_questions):
         selected_questions = selected_questions[: exam.question_limit]
 
@@ -538,8 +533,6 @@ def start_attempt(
 
     for display_order, question in enumerate(selected_questions):
         ordered_opts = sorted(question.options, key=lambda o: (o.position, o.id))
-        if exam.randomize_options and not question.source_file_id:
-            _SYSTEM_RANDOM.shuffle(ordered_opts)
         aq = attempt_models.AttemptQuestion(
             attempt_id=attempt.id,
             question_id=question.id,

@@ -227,8 +227,6 @@ def _create_draft_exam(
             "duration_minutes": duration_minutes,
             "pass_mark": str(pass_mark),
             "question_limit": question_limit,
-            "randomize_questions": True,
-            "randomize_options": True,
             "max_attempts": max_attempts,
             "show_result": show_result,
             "show_correct_answers": show_correct_answers,
@@ -817,6 +815,8 @@ _INVALID_EXAM_PATCH_PAYLOADS: list[dict[str, object]] = [
     {"pass_mark": "NaN"},
     {"randomize_questions": None},
     {"randomize_options": None},
+    {"randomize_questions": True},
+    {"randomize_options": True},
     {"max_attempts": None},
     {"show_result": None},
     {"show_correct_answers": None},
@@ -1489,3 +1489,50 @@ def test_exam_mutations_acquire_row_locks_and_compile_for_postgresql(
                 assert "OUTER JOIN" not in sql
         finally:
             event.remove(db, "do_orm_execute", _capture_for_update)
+
+
+def test_randomization_flags_omitted_from_responses_and_disabled_in_db(
+    exam_env: SimpleNamespace,
+) -> None:
+    created = _create_draft_exam(exam_env, title="Deterministic Exam")
+    assert "randomize_questions" not in created
+    assert "randomize_options" not in created
+
+    from app.exams.models import Exam as ExamModel
+
+    with exam_env.session_factory() as db:
+        row = db.get(ExamModel, UUID(created["id"]))
+        assert row is not None
+        assert row.randomize_questions is False
+        assert row.randomize_options is False
+
+    admin_detail = exam_env.client.get(
+        f"/api/admin/exams/{created['id']}",
+        headers=exam_env.admin_headers,
+    )
+    assert admin_detail.status_code == 200
+    assert "randomize_questions" not in admin_detail.json()
+    assert "randomize_options" not in admin_detail.json()
+
+    save_resp = exam_env.client.put(
+        f"/api/admin/exams/{created['id']}/questions",
+        headers=exam_env.admin_headers,
+        json={"questions": [_sample_question_payload("Q1")]},
+    )
+    assert save_resp.status_code == 200
+
+    pub_resp = exam_env.client.post(
+        f"/api/admin/exams/{created['id']}/publish",
+        headers=exam_env.admin_headers,
+        json={},
+    )
+    assert pub_resp.status_code == 200
+
+    student_list = exam_env.client.get(
+        "/api/exams",
+        headers=exam_env.student_headers,
+    )
+    assert student_list.status_code == 200
+    item = next(e for e in student_list.json() if e["id"] == created["id"])
+    assert "randomize_questions" not in item
+    assert "randomize_options" not in item
