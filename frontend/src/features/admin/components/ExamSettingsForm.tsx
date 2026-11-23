@@ -17,8 +17,6 @@ interface SettingsFormValues {
   passMark: string;
   questionLimit: string;
   maxAttempts: string;
-  randomizeQuestions: boolean;
-  randomizeOptions: boolean;
   showResult: boolean;
   showCorrectAnswers: boolean;
 }
@@ -43,8 +41,6 @@ function toFormValues(exam?: ExamAdminOut | null): SettingsFormValues {
       passMark: "50",
       questionLimit: "",
       maxAttempts: "1",
-      randomizeQuestions: false,
-      randomizeOptions: false,
       showResult: true,
       showCorrectAnswers: false,
     };
@@ -58,8 +54,6 @@ function toFormValues(exam?: ExamAdminOut | null): SettingsFormValues {
     passMark: String(exam.pass_mark),
     questionLimit: exam.question_limit === null ? "" : String(exam.question_limit),
     maxAttempts: String(exam.max_attempts),
-    randomizeQuestions: exam.randomize_questions,
-    randomizeOptions: exam.randomize_options,
     showResult: exam.show_result,
     showCorrectAnswers: exam.show_result ? exam.show_correct_answers : false,
   };
@@ -197,8 +191,6 @@ export function ExamSettingsForm({
       question_limit: values.questionLimit.trim()
         ? Number(values.questionLimit)
         : null,
-      randomize_questions: values.randomizeQuestions,
-      randomize_options: values.randomizeOptions,
       max_attempts: Number(values.maxAttempts),
       show_result: values.showResult,
       show_correct_answers: values.showResult ? values.showCorrectAnswers : false,
@@ -234,7 +226,7 @@ export function ExamSettingsForm({
               {mode === "create" ? "Examination Details & Settings" : "Exam Settings"}
             </CardTitle>
             <CardDescription>
-              Set the timing, pass mark, question order, attempt limit, and what students see
+              Set the timing, pass mark, attempt limit, and what students see
               after finishing.
             </CardDescription>
           </div>
@@ -477,56 +469,10 @@ export function ExamSettingsForm({
 
           <fieldset className="space-y-3 border-0 p-0">
             <legend className="text-sm font-semibold text-foreground">
-              Question Order &amp; Student Results
+              Student Results
             </legend>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3.5 transition-colors hover:bg-muted/40">
-                <input
-                  type="checkbox"
-                  checked={values.randomizeQuestions}
-                  disabled={isDisabled}
-                  onChange={(event) =>
-                    setValues((prev) => ({
-                      ...prev,
-                      randomizeQuestions: event.target.checked,
-                    }))
-                  }
-                  className="mt-0.5 size-5 shrink-0 accent-primary"
-                />
-                <span className="min-w-0 space-y-0.5">
-                  <span className="block text-sm font-medium text-foreground">
-                    Randomize question order
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    Gives each student a shuffled question order.
-                  </span>
-                </span>
-              </label>
-
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3.5 transition-colors hover:bg-muted/40">
-                <input
-                  type="checkbox"
-                  checked={values.randomizeOptions}
-                  disabled={isDisabled}
-                  onChange={(event) =>
-                    setValues((prev) => ({
-                      ...prev,
-                      randomizeOptions: event.target.checked,
-                    }))
-                  }
-                  className="mt-0.5 size-5 shrink-0 accent-primary"
-                />
-                <span className="min-w-0 space-y-0.5">
-                  <span className="block text-sm font-medium text-foreground">
-                    Randomize option order
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    Shuffles choices A–D for each student.
-                  </span>
-                </span>
-              </label>
-
               <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3.5 transition-colors hover:bg-muted/40">
                 <input
                   type="checkbox"

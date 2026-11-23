@@ -164,8 +164,6 @@ def _create_published_exam(
     title: str = "Timer & Concurrency Exam",
     duration_minutes: int = 10,
     max_attempts: int = 1,
-    randomize_questions: bool = False,
-    randomize_options: bool = False,
 ) -> dict[str, object]:
     exam_resp = env.client.post(
         "/api/admin/exams",
@@ -174,8 +172,6 @@ def _create_published_exam(
             "title": title,
             "duration_minutes": duration_minutes,
             "pass_mark": "50.00",
-            "randomize_questions": randomize_questions,
-            "randomize_options": randomize_options,
             "max_attempts": max_attempts,
             "show_result": True,
             "show_correct_answers": True,
@@ -239,8 +235,6 @@ def test_sec_time_01_and_02_authoritative_timer_boundaries_and_refresh_invarianc
             env,
             duration_minutes=10,
             max_attempts=3,
-            randomize_questions=True,
-            randomize_options=True,
         )
         exam_id = exam["id"]
 

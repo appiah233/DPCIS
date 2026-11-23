@@ -45,6 +45,7 @@ from app.exams.pdf_import import (
 from app.exams.pdf_recrop import router as recrop_router
 from app.exams.pdf_storage import (
     delete_source_dir,
+    has_reviewed_crop,
     load_image,
     load_regions,
     regenerate_crops,
@@ -333,6 +334,9 @@ async def import_pdf_route(
             regions = [
                 {"page": region.page, "bbox": list(region.bbox)} for region in question.regions
             ]
+        repaired = has_reviewed_crop(source_id, question.number, regions)
+        if repaired:
+            warnings = [warning for warning in warnings if not warning.startswith("Crop failed:")]
         items.append(
             ParsedQuestion(
                 position=question.number,
@@ -352,7 +356,7 @@ async def import_pdf_route(
                 ],
                 answer_label=cast(OptionLabel, answer[0]) if answer else None,
                 points=answer[1] if answer else Decimal(1),
-                valid=answer is not None and not mismatch and question.crop_valid,
+                valid=answer is not None and not mismatch and (question.crop_valid or repaired),
                 errors=[w for w in warnings if w.startswith("Crop failed:")],
                 warnings=warnings,
                 pdf_options_text=question.options_text,

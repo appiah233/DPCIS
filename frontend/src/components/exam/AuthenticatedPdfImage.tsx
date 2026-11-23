@@ -32,6 +32,8 @@ export function AuthenticatedPdfImage({
   const [zoomPct, setZoomPct] = useState<number>(100);
 
   useEffect(() => {
+    setFailed(false);
+    setObjectUrl(null);
     const controller = new AbortController();
     let createdUrl: string | null = null;
     void (async () => {
@@ -44,9 +46,12 @@ export function AuthenticatedPdfImage({
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       if (!response.ok) { setFailed(true); onError?.(); return; }
-      createdUrl = URL.createObjectURL(await response.blob());
-      if (!controller.signal.aborted) setObjectUrl(createdUrl);
+      const blob = await response.blob();
+      if (controller.signal.aborted) return;
+      createdUrl = URL.createObjectURL(blob);
+      setObjectUrl(createdUrl);
     })().catch(() => {
       if (!controller.signal.aborted) { setFailed(true); onError?.(); }
     });
@@ -71,12 +76,12 @@ export function AuthenticatedPdfImage({
   if (enlargeable) {
     return (
       <>
-        <div className="group relative mb-5">
+        <div className="group relative mb-4">
           <button
             type="button"
             onClick={() => { setZoomPct(100); setLightboxOpen(true); }}
             aria-label={`Enlarge ${enlargeTitle}`}
-            className="block w-full cursor-zoom-in rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex max-w-full cursor-zoom-in flex-col items-start rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {image}
             <span className="mt-1.5 inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground shadow-sm group-hover:text-foreground">

@@ -253,8 +253,6 @@ def _create_exam_with_two_questions(
             "duration_minutes": 30,
             "pass_mark": "50.00",
             "question_limit": question_limit,
-            "randomize_questions": False,
-            "randomize_options": False,
             "max_attempts": 3,
             "show_result": show_result,
             "show_correct_answers": show_correct_answers,

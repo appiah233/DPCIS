@@ -25,8 +25,6 @@ export interface ExamCreate {
   duration_minutes: number;
   pass_mark: DecimalValue;
   question_limit: number | null;
-  randomize_questions: boolean;
-  randomize_options: boolean;
   max_attempts: number;
   show_result: boolean;
   show_correct_answers: boolean;
@@ -42,8 +40,6 @@ export interface ExamAdminOut {
   duration_minutes: number;
   pass_mark: DecimalValue;
   question_limit: number | null;
-  randomize_questions: boolean;
-  randomize_options: boolean;
   max_attempts: number;
   show_result: boolean;
   show_correct_answers: boolean;

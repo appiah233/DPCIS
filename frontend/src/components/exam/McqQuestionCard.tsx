@@ -79,9 +79,9 @@ export function McqQuestionCard({
         {formattedPoints ? <Badge variant="outline">{formattedPoints}</Badge> : null}
       </CardHeader>
 
-      <CardContent className="pt-5 sm:pt-6">
+      <CardContent className="pt-4 sm:pt-5">
         <fieldset className="m-0 min-w-0 border-0 p-0">
-          <legend className="mb-5 block w-full select-none break-words p-0 text-lg font-semibold leading-relaxed text-foreground sm:text-xl">
+          <legend className="mb-4 block w-full select-none break-words p-0 text-base font-semibold leading-relaxed text-foreground sm:text-lg">
             {hasImage ? `Question ${questionNumber}: choose one answer` : questionText}
           </legend>
           {imageUrls.map((path, imgIndex) => (
@@ -96,11 +96,11 @@ export function McqQuestionCard({
                   : `Question ${questionNumber}`
               }
               onError={handleImageError}
-              className="h-auto w-full max-w-full rounded-lg border border-border bg-white shadow-sm"
+              className="h-auto max-h-80 w-auto max-w-full rounded-lg border border-border bg-white object-contain shadow-sm sm:max-h-96 sm:max-w-xl"
             />
           ))}
 
-          <div className="grid gap-3">
+          <div className="grid gap-2.5">
             {options.map((option) => {
               const optionIdAttr = `${radioGroupName}-${option.optionId}`;
               const isSelected = selectedOptionId === option.optionId;
@@ -111,7 +111,7 @@ export function McqQuestionCard({
                   htmlFor={optionIdAttr}
                   data-selected={isSelected ? "true" : "false"}
                   className={cn(
-                    "mcq-option-card group relative flex min-h-14 cursor-pointer items-start gap-3.5 rounded-xl border bg-card px-4 py-3.5 text-left",
+                    "mcq-option-card group relative flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border bg-card px-3.5 py-2.5 text-left",
                     isSelected
                       ? "border-primary bg-accent"
                       : "border-input/80 hover:border-primary/70 hover:bg-muted/50",
@@ -132,7 +132,7 @@ export function McqQuestionCard({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors",
+                      "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors",
                       isSelected
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-card text-foreground group-hover:border-primary group-hover:text-primary",
@@ -141,14 +141,14 @@ export function McqQuestionCard({
                     {option.label}
                   </span>
 
-                  <span className="min-w-0 flex-1 break-words pt-1 text-base leading-relaxed text-foreground">
+                  <span className="min-w-0 flex-1 break-words pt-0.5 text-sm leading-relaxed text-foreground sm:text-base">
                     {hasImage ? `Select ${option.label}` : option.optionText}
                   </span>
 
                   {isSelected ? (
                     <span
                       aria-hidden="true"
-                      className="mt-1.5 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary"
+                      className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary"
                     >
                       <Check className="size-4" />
                       <span className="hidden sm:inline">Selected</span>

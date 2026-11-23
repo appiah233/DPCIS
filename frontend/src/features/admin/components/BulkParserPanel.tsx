@@ -291,7 +291,7 @@ export function BulkParserPanel({
         setRequestError("The answer key or questions need attention. Review the preview, correct the issues, and try again.");
         return;
       }
-      if (response.valid_questions.some((q) => q.source_file_id && q.warnings?.length)) {
+      if (response.valid_questions.some(needsReview)) {
         setRequestError("Review and acknowledge the flagged PDF crops in the preview before saving.");
         return;
       }
@@ -622,6 +622,9 @@ export function BulkParserPanel({
                 </Badge>
                 <Badge variant={parseResult.error_count > 0 ? "destructive" : "secondary"}>
                   Needs attention: {parseResult.error_count}
+                </Badge>
+                <Badge variant={orderedBlocks.some(needsReview) ? "destructive" : "secondary"}>
+                  Crops to review: {orderedBlocks.filter(needsReview).length}
                 </Badge>
               </div>
             </div>

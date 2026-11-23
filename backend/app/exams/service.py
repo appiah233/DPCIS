@@ -197,8 +197,6 @@ def _to_exam_admin_out(exam: exam_models.Exam, *, question_count: int) -> ExamAd
         duration_minutes=exam.duration_minutes,
         pass_mark=exam.pass_mark,
         question_limit=exam.question_limit,
-        randomize_questions=exam.randomize_questions,
-        randomize_options=exam.randomize_options,
         max_attempts=exam.max_attempts,
         show_result=exam.show_result,
         show_correct_answers=exam.show_correct_answers,
@@ -329,8 +327,8 @@ def create_exam(
         duration_minutes=data.duration_minutes,
         pass_mark=data.pass_mark,
         question_limit=data.question_limit,
-        randomize_questions=data.randomize_questions,
-        randomize_options=data.randomize_options,
+        randomize_questions=False,
+        randomize_options=False,
         max_attempts=data.max_attempts,
         show_result=data.show_result,
         show_correct_answers=data.show_correct_answers,
@@ -399,8 +397,12 @@ def update_exam(
 
     update_data = data.model_dump(exclude_unset=True)
     update_data.pop("status", None)
+    update_data.pop("randomize_questions", None)
+    update_data.pop("randomize_options", None)
     for field, value in update_data.items():
         setattr(exam, field, value)
+    exam.randomize_questions = False
+    exam.randomize_options = False
     exam.updated_at = _utc_now()
 
     db.add(exam)
@@ -858,8 +860,6 @@ def _build_student_exam_out(
         duration_minutes=exam.duration_minutes,
         pass_mark=exam.pass_mark,
         question_limit=exam.question_limit,
-        randomize_questions=exam.randomize_questions,
-        randomize_options=exam.randomize_options,
         max_attempts=exam.max_attempts,
         show_result=exam.show_result,
         question_count=effective_question_count,

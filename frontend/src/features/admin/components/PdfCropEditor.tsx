@@ -31,8 +31,8 @@ export function PdfCropEditor({ examId, question, pageDimensions, onUpdated }: P
 
   useEffect(() => setRegions(question.image_regions ?? []), [question.image_regions]);
 
-  const commit = async (next: Region[], strict = true) => {
-    if (!question.source_file_id || !question.source_number) return;
+  const commit = async (next: Region[], strict = true): Promise<boolean> => {
+    if (!question.source_file_id || !question.source_number) return false;
     setSaving(true);
     setError(null);
     try {
@@ -41,9 +41,11 @@ export function PdfCropEditor({ examId, question, pageDimensions, onUpdated }: P
       );
       setRegions(result.regions);
       onUpdated(result.regions, result.image_urls);
+      return true;
     } catch (reason) {
       setRegions(question.image_regions ?? []);
       setError(reason instanceof Error ? reason.message : "Crop update failed.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -201,12 +203,12 @@ export function PdfCropEditor({ examId, question, pageDimensions, onUpdated }: P
           }}
           title={`Question ${question.position}: edit crop on page`}
           busy={saving}
+          error={error}
           onApply={async (updated: PageCropRegion) => {
             const next = regions.map((r, idx) =>
               idx === fullPageIndex ? { page: updated.page, bbox: [...updated.bbox] } : r,
             );
-            await commit(next, false);
-            setFullPageIndex(null);
+            if (await commit(next, false)) setFullPageIndex(null);
           }}
         />
       ) : null}

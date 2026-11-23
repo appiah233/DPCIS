@@ -164,8 +164,6 @@ def test_e2e_admin_parser_publish_student_refresh_grading_admin_oversight_and_cl
                 "duration_minutes": 45,
                 "pass_mark": "60.00",
                 "question_limit": 4,  # Temporarily invalid (> 3 questions after save)
-                "randomize_questions": True,
-                "randomize_options": True,
                 "max_attempts": 2,
                 "show_result": True,
                 "show_correct_answers": True,

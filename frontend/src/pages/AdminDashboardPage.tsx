@@ -215,8 +215,6 @@ export function AdminDashboardPage() {
         pass_mark: fullExam.pass_mark,
         max_attempts: fullExam.max_attempts,
         question_limit: fullExam.question_limit,
-        randomize_questions: fullExam.randomize_questions,
-        randomize_options: fullExam.randomize_options,
         show_result: fullExam.show_result,
         show_correct_answers: fullExam.show_correct_answers,
       });

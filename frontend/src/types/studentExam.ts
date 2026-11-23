@@ -10,8 +10,6 @@ export interface ExamStudentOut {
   duration_minutes: number;
   pass_mark: string | number;
   question_limit: number | null;
-  randomize_questions: boolean;
-  randomize_options: boolean;
   max_attempts: number;
   show_result: boolean;
   question_count: number;
