@@ -55,8 +55,16 @@ def require_google_email_proof(db: Session, identity: AuthIdentity) -> None:
 
 
 def confirm_google_email_and_password(
-    db: Session, identity: AuthIdentity, settings: Settings, otp: str, password: str
+    db: Session,
+    identity: AuthIdentity,
+    settings: Settings,
+    otp: str,
+    password: str,
+    *,
+    origin: str | None = None,
 ) -> None:
+    if origin is None or origin not in settings.CORS_ORIGINS:
+        raise HTTPException(403, "Untrusted application origin")
     if not google_email_needs_proof(db, identity):
         raise HTTPException(409, "Google email proof is not required")
     if not settings.NEON_AUTH_BASE_URL:
@@ -67,15 +75,56 @@ def confirm_google_email_and_password(
     request = Request(  # noqa: S310 - validated HTTPS Neon Auth origin above
         settings.NEON_AUTH_BASE_URL.rstrip("/") + "/email-otp/reset-password",
         data=payload,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Origin": origin,
+        },
         method="POST",
     )
     try:
         with urlopen(request, timeout=8) as response:  # noqa: S310
             if response.status >= 300:
                 raise HTTPException(400, "Verification code was not accepted")
+            try:
+                confirmed = json.loads(response.read(8192))
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise HTTPException(
+                    502, "Authentication provider returned an invalid response"
+                ) from exc
+            if not isinstance(confirmed, dict) or confirmed.get("success") is not True:
+                raise HTTPException(
+                    502, "Authentication provider did not confirm password creation"
+                )
     except HTTPError as exc:
-        raise HTTPException(400, "Verification code or password was not accepted") from exc
+        try:
+            rejected = json.loads(exc.read(8192))
+        except (ValueError, UnicodeDecodeError):
+            rejected = {}
+        code = rejected.get("code") if isinstance(rejected, dict) else None
+        if not isinstance(code, str):
+            code = None
+        if exc.code == 429 or code in ("TOO_MANY_REQUESTS", "TOO_MANY_ATTEMPTS"):
+            raise HTTPException(
+                429, "Too many attempts. Wait before requesting a new code."
+            ) from exc
+        if exc.code >= 500:
+            raise HTTPException(503, "Authentication provider is temporarily unavailable") from exc
+        messages = {
+            "OTP_EXPIRED": "Your verification code has expired. Request a new code.",
+            "INVALID_OTP": (
+                "The verification code is incorrect. Use the most recent code sent to you."
+            ),
+            "PASSWORD_TOO_SHORT": "Please use a password with at least 8 characters.",
+            "PASSWORD_TOO_LONG": "Please use a password with no more than 128 characters.",
+        }
+        if code in ("MISSING_ORIGIN", "INVALID_ORIGIN"):
+            raise HTTPException(
+                502, "Authentication configuration needs attention. Please try again later."
+            ) from exc
+        raise HTTPException(
+            400, messages.get(code, "Verification code or password was not accepted")
+        ) from exc
     except (URLError, TimeoutError) as exc:
         raise HTTPException(503, "Authentication provider is temporarily unavailable") from exc
     now = datetime.now(UTC)

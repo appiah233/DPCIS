@@ -171,13 +171,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/auth/google-email-proof", status_code=204, tags=["auth"])
     def confirm_google_email_proof(
         payload: GoogleEmailProofRequest,
+        request: Request,
         identity: AuthIdentity = Depends(require_identity),
         db=Depends(get_db),
     ) -> None:
         from app.auth.google_email_proof import confirm_google_email_and_password
 
         confirm_google_email_and_password(
-            db, identity, resolved_settings, payload.otp, payload.password
+            db, identity, resolved_settings, payload.otp, payload.password,
+            origin=request.headers.get("origin"),
         )
 
     app.include_router(exams_router)
