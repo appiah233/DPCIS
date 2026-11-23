@@ -1,6 +1,7 @@
-# syntax=docker/dockerfile:1
+# Official Docker Library mirror avoids Docker Hub's shared anonymous pull limits.
+ARG PYTHON_IMAGE=public.ecr.aws/docker/library/python:3.12-slim
 
-FROM python:3.12-slim AS builder
+FROM ${PYTHON_IMAGE} AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -17,7 +18,7 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 
-FROM python:3.12-slim AS runtime
+FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
