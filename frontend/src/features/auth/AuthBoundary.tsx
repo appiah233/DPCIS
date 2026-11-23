@@ -59,6 +59,18 @@ function sanitizeAuthError(error: unknown, fallback: string): string {
   const raw = extractRawErrorMessage(error);
   const code = error && typeof error === "object" && "code" in error
     ? String((error as { code?: unknown }).code ?? "") : "";
+  if (/verification code.*expired/i.test(raw)) {
+    return "Your verification code has expired. Request a new code.";
+  }
+  if (/verification code.*incorrect/i.test(raw)) {
+    return "The verification code is incorrect. Use the most recent code sent to you.";
+  }
+  if (/password.*(too long|no more than 128)/i.test(raw)) {
+    return "Please use a password with no more than 128 characters.";
+  }
+  if (/authentication (configuration|provider)/i.test(raw)) {
+    return "The sign-in service is temporarily unavailable. Please try again shortly.";
+  }
   if (/EMAIL_NOT_VERIFIED|email.*(not verified|unverified)|verify.*email/i.test(`${code} ${raw}`)) {
     return "Your email address needs verification. Request a code below to finish signing in.";
   }
@@ -357,6 +369,7 @@ export function AuthBoundary({ onAuthSuccess, embedded = false }: AuthBoundaryPr
                 try {
                   const sent = await requestPasswordCode(user.email!);
                   if (sent.error) throw sent.error;
+                  setPasswordResetCode("");
                   setSignupNotice("A verification code was sent to your email.");
                 } catch (error) {
                   setLocalError(sanitizeAuthError(error, "We could not send a code. Try again."));
@@ -367,9 +380,10 @@ export function AuthBoundary({ onAuthSuccess, embedded = false }: AuthBoundaryPr
             <Input id={`${baseId}-google-code`} inputMode="numeric" autoComplete="one-time-code"
               value={passwordResetCode} onChange={(event) => setPasswordResetCode(event.target.value.trim())} />
             <Label htmlFor={`${baseId}-google-password`}>Create a password</Label>
-            <Input id={`${baseId}-google-password`} type="password" autoComplete="new-password"
+            <Input id={`${baseId}-google-password`} type="password" autoComplete="new-password" minLength={8} maxLength={128}
               value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-            <Button type="button" disabled={verificationBusy || !passwordResetCode || newPassword.length < 8}
+            <p className="text-xs text-muted-foreground">Use 8–128 characters. Enter the most recent verification code sent to your email.</p>
+            <Button type="button" disabled={verificationBusy || !passwordResetCode || newPassword.length < 8 || newPassword.length > 128}
               onClick={() => void (async () => {
                 setVerificationBusy(true);
                 setLocalError(null);
