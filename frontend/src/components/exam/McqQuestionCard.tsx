@@ -96,7 +96,7 @@ export function McqQuestionCard({
                   : `Question ${questionNumber}`
               }
               onError={handleImageError}
-              className="h-auto max-h-80 w-auto max-w-full rounded-lg border border-border bg-white object-contain shadow-sm sm:max-h-96 sm:max-w-xl"
+              className="h-auto max-h-96 w-auto max-w-full rounded-lg border border-border bg-white object-contain shadow-sm sm:max-h-112 sm:max-w-2xl"
             />
           ))}
 
